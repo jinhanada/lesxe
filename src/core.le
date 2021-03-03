@@ -1,0 +1,20 @@
+(def list (fn Xs Xs))
+
+(def + (fn (a b) (%prim:add a b)))
+(def - (fn (a b) (%prim:sub a b)))
+(def * (fn (a b) (%prim:mul a b)))
+(def / (fn (a b) (%prim:div a b)))
+(def mod (fn (a b)) (%prim:mod a b))
+
+
+;; Macro System
+;; =====================================
+
+(def MACRO-TABLE ())
+
+(def expand-macro
+     (fn (expr) expr))
+
+(set! %pre-eval
+      (fn (expr)
+        (expand-macro expr)))
