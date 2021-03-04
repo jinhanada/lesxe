@@ -1441,21 +1441,13 @@ static int evalQuote(LeVM* vm, Obj xs) {
   return Le_OK;
 }
 
+
 // ===== Arithmetics =====
 
 #define ARITH_PROLOGUE                                                  \
   SaveStack;                                                            \
   Obj a = Car(rest);                                                    \
   Obj b = Second(rest);                                                 \
-  int i = Push(b);                                                      \
-  int code = eval(vm, a);                                               \
-  if (code != Le_OK) RestoreReturn(code);                               \
-  b = Get(i);                                                           \
-  Set(i, vm->result);                                                   \
-  code = eval(vm, b);                                                   \
-  if (code != Le_OK) RestoreReturn(code);                               \
-  b = vm->result;                                                       \
-  a = Pop();                                                            \
   if (!le_is_num(a) || !le_is_num(b))                                   \
     return le_raise_with(vm, Sym(ExpectInteger), rest);                 \
   int na = le_obj2int(a);                                               \
@@ -1513,27 +1505,12 @@ static int evalPrimEq(LeVM* vm, Obj rest) {
   Obj a = Car(rest);
   Obj b = Second(rest);
 
-  Push(b);
-  int code = eval(vm, a);
-  if (code != Le_OK) RestoreReturn(code);
-  a = vm->result;
-
-  b = Pop();
-  Push(a);
-  code = eval(vm, b);
-  if (code != Le_OK) RestoreReturn(code);
-  a = Pop();
-  b = vm->result;
-
   vm->result = a == b ? Sym(True) : nil;
   return Le_OK;
 }
 
 static int evalPrimNot(LeVM* vm, Obj rest) {
   Obj x = Car(rest);
-  int code = eval(vm, x);
-  ExpectOK;
-  x = vm->result;
   vm->result = x == nil ? Sym(True) : nil;
   return Le_OK;
 }
@@ -1542,18 +1519,6 @@ static int evalPrimGt(LeVM* vm, Obj rest) {
   SaveStack;
   Obj a = Car(rest);
   Obj b = Second(rest);
-
-  Push(b);
-  int code = eval(vm, a);
-  if (code != Le_OK) RestoreReturn(code);
-  a = vm->result;
-
-  b = Pop();
-  Push(a);
-  code = eval(vm, b);
-  if (code != Le_OK) RestoreReturn(code);
-  a = Pop();
-  b = vm->result;
 
   if (!le_is_num(a) || !le_is_num(b))
     return le_raise_with(vm, Sym(ExpectInteger), rest);
@@ -1618,23 +1583,25 @@ static int evalPair(LeVM* vm, Obj xs) {
   if (first == Sym(While))    return evalWhile(vm, rest);
   if (first == Sym(Quote))    return evalQuote(vm, rest);
 
+  // eval args
   Push(first);
   code = evalArgs(vm, rest);
   if (code != Le_OK) RestoreReturn(code);
   Obj args = vm->result;
   first = Pop();
 
-  if (first == Sym(PrimAdd))  return evalPrimAdd(vm,  rest);
-  if (first == Sym(PrimSub))  return evalPrimSub(vm,  rest);
-  if (first == Sym(PrimMul))  return evalPrimMul(vm,  rest);
-  if (first == Sym(PrimDiv))  return evalPrimDiv(vm,  rest);
-  if (first == Sym(PrimMod))  return evalPrimMod(vm,  rest);
-  if (first == Sym(PrimEq))   return evalPrimEq(vm,   rest);
-  if (first == Sym(PrimNot))  return evalPrimNot(vm,  rest);
-  if (first == Sym(PrimGt))   return evalPrimGt(vm,   rest);
+  if (first == Sym(PrimAdd))  return evalPrimAdd(vm,  args);
+  if (first == Sym(PrimSub))  return evalPrimSub(vm,  args);
+  if (first == Sym(PrimMul))  return evalPrimMul(vm,  args);
+  if (first == Sym(PrimDiv))  return evalPrimDiv(vm,  args);
+  if (first == Sym(PrimMod))  return evalPrimMod(vm,  args);
+  if (first == Sym(PrimEq))   return evalPrimEq(vm,   args);
+  if (first == Sym(PrimNot))  return evalPrimNot(vm,  args);
+  if (first == Sym(PrimGt))   return evalPrimGt(vm,   args);
   if (first == Sym(PrimPutc)) return evalPrimPutc(vm, args);
   if (first == Sym(PrimGetc)) return evalPrimGetc(vm, args);
 
+  // eval f
   Push(args);
   code = eval(vm, first);
   ExpectOK;
