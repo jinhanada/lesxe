@@ -88,6 +88,7 @@ typedef struct {
 
 struct LeObj {
   intptr_t header;
+  LeObj*   hash;
   union {
     Array   Array;
     Symbol  Symbol;
@@ -97,6 +98,8 @@ struct LeObj {
     Root    Root;
   };
 };
+
+#define OBJECT_HEADER_CELLS 2
 
 
 // ===== VM =====
@@ -232,7 +235,6 @@ static int writeTextFile(char* fname, char* s) {
   単にforward先のオブジェクトアドレスを入れるだけで良い。
 */
 
-#define HEADER_CELLS      1
 #define HEADER_CELLS_BIT  5 // << 5
 #define HEADER_CELLS_MASK (-1   << HEADER_CELLS_BIT)
 #define HEADER_TYPE_BIT   1 // << 1
@@ -362,6 +364,45 @@ Public int le_is_string(Obj p) {
 }
 
 
+// ===== Hash =====
+// nil: 0
+// number: そのもの
+// string: 文字列の実体から計算
+// other: 現在のアドレスを、2進数で最下位の固定ゼロが消えるようにシフトしたもの
+
+static Cell hashDJB2(char* s) {
+  Cell hash = 5381;
+  for (char c = *s; c != '\0'; s++, c = *s) {
+    hash = ((hash << 5) + hash) + c; // hash * 33 + c
+  }
+  
+  return hash;
+}
+
+Public Obj le_get_hash(Obj obj) {
+  if (obj == nil) return le_int2obj(0);
+  if (le_is_num(obj)) return obj;
+
+  if (le_is_string(obj)) {
+    Cell h = hashDJB2(le_cstr_of(obj));
+    Obj hash = le_int2obj(h);
+    obj->hash = hash; 
+    return hash;
+  }
+
+  // normal object
+  
+  // already have hash
+  if (obj->hash != nil) return obj->hash;
+
+  // calculate hash
+  Cell h = ((Cell)obj) >> 3;
+  Obj hash = le_int2obj(h);
+  obj->hash = hash;
+  return hash;
+}
+
+
 // ===== Temporary stack =====
 
 Public int le_push(LeVM* vm, Obj obj) {
@@ -413,7 +454,7 @@ static void assertAllAlive(LeVM* vm) {
   while (vm->scanned < vm->here) {
     Obj  obj    = (Obj)vm->scanned;
     Cell cells  = cellsOf(obj->header);
-    Cell actual = cells + HEADER_CELLS;
+    Cell actual = cells + OBJECT_HEADER_CELLS;
     vm->scanned += actual;
 
     // no need to check
@@ -445,7 +486,7 @@ static Obj memMove(LeVM* vm, Obj obj) {
   if (isMoved(obj->header)) return (Obj)obj->header;
 
   Cell cells  = cellsOf(obj->header);
-  Cell actual = cells + HEADER_CELLS;
+  Cell actual = cells + OBJECT_HEADER_CELLS;
   Obj  src    = obj;
   Obj  dst    = (Obj)vm->here;
   vm->here += actual;
@@ -489,7 +530,7 @@ Public void le_gc(LeVM* vm) {
   while (vm->scanned < vm->here) {
     Obj  obj    = (Obj)vm->scanned;
     Cell cells  = cellsOf(obj->header);
-    Cell actual = cells + HEADER_CELLS;
+    Cell actual = cells + OBJECT_HEADER_CELLS;
     vm->scanned += actual;
 
     // no need to scan
@@ -514,7 +555,7 @@ static int memClaim(LeVM* vm, Cell cells) {
 }
 
 static Obj memAllot(LeVM* vm, Cell cells, Cell header) {
-  Cell actual = cells + 1; // header size
+  Cell actual = cells + OBJECT_HEADER_CELLS;
 
   if (memClaim(vm, actual)) {
     le_gc(vm);
@@ -524,6 +565,7 @@ static Obj memAllot(LeVM* vm, Cell cells, Cell header) {
   Obj obj = (Obj)vm->here;
   vm->here += actual;
   obj->header = header;
+  obj->hash = nil;
   memset(&(obj->Array.data), nil, cells * sizeof(Cell)); // nil clear
   return obj;
 }

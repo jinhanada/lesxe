@@ -333,6 +333,29 @@ void test_read_sxp(LeVM* vm) {
   free(s);
 }
 
+void test_hash(LeVM* vm) {
+  // nil
+  assert(le_get_hash(nil) == le_int2obj(0));
+
+  // number
+  Obj n42 = le_int2obj(42);
+  assert(le_get_hash(n42) == n42);
+
+  // normal object
+  Obj t = Sym(True);
+  Obj hash = le_get_hash(t);
+  le_gc(vm); // change address
+  assert(t != Sym(True)); // different address
+  assert(le_get_hash(Sym(True)) == hash); // same hash
+
+  // string
+  Obj s1 = le_new_str_from(vm, "foo");
+  Obj h1 = le_get_hash(s1);
+  Obj s2 = le_new_str_from(vm, "foo");
+  Obj h2 = le_get_hash(s2);
+  assert(h1 == h2);
+}
+
 void test_eval_num(LeVM* vm) {
   int code = le_eval_str(vm, "123");
   Obj x = vm->result;
@@ -583,6 +606,7 @@ void test_all() {
   test(gc_move);
   test(gc_integration);
   testVM(read_sxp);
+  testVM(hash);
   // eval
   testVM(eval_num);
   testVM(eval_str);

@@ -42,6 +42,8 @@ int le_is_closure(LeObj* p);
 int le_is_bytes(LeObj* p);
 int le_is_string(LeObj* p);
 
+LeObj* le_get_hash(LeObj* x);
+
 int le_vm_cells(LeVM* vm);
 LeObj* le_vm_result(LeVM* vm);
 LeObj* le_vm_error(LeVM* vm);
