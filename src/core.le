@@ -55,6 +55,14 @@
 (def third  (fn (Xs) (car (cdr (cdr Xs)))))
 
 
+(def list:map
+     (fn (Xs F)
+       (if Xs
+           (cons (F (car Xs))
+                 (list:map (cdr Xs) F))
+           nil)))
+
+
 ;; ===== Assoc (mutable) =====
 
 (def assoc:sign '<Assoc>)
@@ -185,10 +193,116 @@
 ;; Macro System
 ;; =====================================
 
-(def MACRO-TABLE (dict:new))
+(def macro:SYNTAX-DICT (dict:new))
+(def macro:MACRO-DICT (dict:new))
 
-(def expand-macro-1
-     (fn (Expr Counter) Expr))
+(def expand-macro-1 nil) ;; for recursion
+
+(def macro:aux-rec
+     (fn (Counter)
+       (fn (Expr)
+         (expand-macro-1 Counter Expr))))
+
+(dict:set!
+ macro:SYNTAX-DICT
+ 'let
+ (fn (Counter Expr)
+   (let ((Binds (car Expr))
+         (Body  (cdr Expr))
+         (F (macro:aux-rec Counter))
+         (Binds (list:map Binds (fn (X) (list (car X) (F (second X))))))
+         (Body (list:map Body F)))
+     (cons 'let (cons Binds Body)))))
+
+(dict:set!
+ macro:SYNTAX-DICT
+ 'if
+ (fn (Counter Expr)
+   (let ((F    (macro:aux-rec Counter))
+         (Cond (F (car Expr)))
+         (Then (F (second Expr)))
+         (Else (F (third Expr))))
+     (list 'if Cond Then Else))))
+
+(dict:set!
+ macro:SYNTAX-DICT
+ 'while
+ (fn (Counter Expr)
+   (let ((F    (macro:aux-rec Counter))
+         (Cond (F (car Expr)))
+         (Body (list:map (cdr Expr) F)))
+     (cons 'while (cons Cond Body)))))
+
+(dict:set!
+ macro:SYNTAX-DICT
+ 'set!
+ (fn (Counter Expr)
+   (let ((F   (macro:aux-rec Counter))
+         (Var (car Expr))
+         (Val (F (second Expr))))
+     (list 'set! Var Val))))
+
+(dict:set!
+ macro:SYNTAX-DICT
+ 'fn
+ (fn (Counter Expr)
+   (let ((F    (macro:aux-rec Counter))
+         (Vars (car Expr))
+         (Body (list:map (cdr Expr) F)))
+     (cons 'fn (cons Vars Body)))))
+
+(dict:set!
+ macro:SYNTAX-DICT
+ 'def
+ (fn (Counter Expr)
+   (let ((F   (macro:aux-rec Counter))
+         (Var (car Expr))
+         (Val (F (second Expr))))
+     (list 'def Var Val))))
+
+(dict:set!
+ macro:SYNTAX-DICT
+ 'quote
+ (fn (Counter Expr)
+   (cons 'quote Expr)))
+
+(dict:set!
+ macro:SYNTAX-DICT
+ 'apply
+ (fn (Counter Expr)
+   (let ((F (macro: aux-rec Counter)))
+     (list 'apply
+           (F (car Expr))
+           (F (second Expr))))))
+
+(dict:set!
+ macro:MACRO-DICT
+ 'demac
+ (fn (Def . Body)
+   ;; (demacro (Name . Args) . Body)
+   ;; => (dict:set! macro:MACRO-DICT (quote . Name) (fn Args . Body))
+   (let ((Name (car Def))
+         (Args (cdr Def)))
+     (list 'dict:set! 'macro:MACRO-DICT
+           (cons 'quote Name)
+           (cons 'fn (cons Args Body))))))
+
+(set! expand-macro-1
+      (fn (Counter Expr)
+        (if (pair? Expr)
+            (let ((X  (car Expr))
+                  (Xs (cdr Expr))
+                  (Syntax (dict:get macro:SYNTAX-DICT X))
+                  (Macro  (dict:get macro:MACRO-DICT X)))
+              (if Syntax
+                  (Syntax Counter Xs)
+                  (if Macro
+                      (let ()
+                        (Counter)
+                        (apply Macro Xs))
+                      (cons (expand-macro-1 Counter X)
+                            (list:map Xs (fn (X) (expand-macro-1 Counter X)))))))
+            Expr)))
 
 (def expand-macro
      (fn (Expr)
@@ -197,9 +311,19 @@
              (Counter (fn () (set! Count (+ Count 1)))))
          (while (> Count 0)
                 (set! Count 0)
-                (set! X (expand-macro-1 X Counter)))
+                (set! X (expand-macro-1 Counter X)))
          X)))
 
 (set! %pre-eval
       (fn (Expr)
         (expand-macro Expr)))
+
+
+;; Macros
+
+(demac (defn Def . Body)
+  (let ((Name (car Def))
+        (Args (cdr Def)))
+    (list 'def
+          Name
+          (cons 'fn (cons Args Body)))))

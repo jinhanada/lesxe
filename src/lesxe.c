@@ -30,7 +30,7 @@ enum {
       SymQuote, SymBackquote,
       SymUnquote, SymUnquoteSplicing,
       SymLet, SymFn, SymDef, SymIf,
-      SymSet, SymWhile, SymPreEval,
+      SymSet, SymWhile, SymApply, SymPreEval,
 
       /* types */
       SymNumber, SymArray, SymSymbol, SymPair, SymClosure, SymBytes, SymString,
@@ -985,6 +985,7 @@ static void setupSymbols(LeVM* vm) {
   DefSym(If,                    "if");
   DefSym(Set,                   "set!");
   DefSym(While,                 "while");
+  DefSym(Apply,                 "apply");
   DefSym(PreEval,               "%pre-eval");
   /* types */
   DefSym(Number,                "number");
@@ -1551,6 +1552,16 @@ static int evalQuote(LeVM* vm, Obj xs) {
   return Le_OK;
 }
 
+static int evalApply(LeVM* vm, Obj xs) {
+  // (apply F Args)
+  // F and Args should be evaled
+  Obj f    = Car(xs);
+  Obj args = Second(xs);
+  if (!le_is_closure(f))
+    return le_raise_with(vm, Sym(NotAProc), f);
+  return applyClosure(vm, f, args);
+}
+
 
 // ===== Arithmetics =====
 
@@ -1847,6 +1858,7 @@ static int evalPair(LeVM* vm, Obj xs) {
   Obj args = vm->result;
   first = Pop();
 
+  if (first == Sym(Apply))        return evalApply(vm, args);
   if (first == Sym(PrimAdd))      return evalPrimAdd(vm,  args);
   if (first == Sym(PrimSub))      return evalPrimSub(vm,  args);
   if (first == Sym(PrimMul))      return evalPrimMul(vm,  args);
