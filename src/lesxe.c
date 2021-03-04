@@ -40,6 +40,7 @@ enum {
       /* compare */ SymPrimEq, SymPrimNot, SymPrimGt,
       /* types */ SymPrimTypeOf,
       /* array */ SymPrimArrayNew, SymPrimArrayGet, SymPrimArraySet, SymPrimArrayLen,
+      /* pair */ SymPrimCons, SymPrimCar, SymPrimCdr, SymPrimSetCar, SymPrimSetCdr,
       /* string */ SymPrimStr,
       /* i/o */ SymPrimPutc, SymPrimGetc, SymPrimPrint,
       
@@ -1007,6 +1008,11 @@ static void setupSymbols(LeVM* vm) {
   DefSym(PrimArrayGet,          "%prim:array-get");
   DefSym(PrimArraySet,          "%prim:array-set!");
   DefSym(PrimArrayLen,          "%prim:array-len");
+  DefSym(PrimCons,              "%prim:cons");
+  DefSym(PrimCar,               "%prim:car");
+  DefSym(PrimCdr,               "%prim:cdr");
+  DefSym(PrimSetCar,            "%prim:set-car!");
+  DefSym(PrimSetCdr,            "%prim:set-cdr!");
   DefSym(PrimStr,               "%prim:str");
   DefSym(PrimPutc,              "%prim:putc");
   DefSym(PrimGetc,              "%prim:getc");
@@ -1694,6 +1700,50 @@ static int evalPrimArrayLen(LeVM* vm, Obj args) {
 }
 
 
+// ===== Pair =====
+
+static int evalPrimCons(LeVM* vm, Obj args) {
+  vm->result = Cons(vm, Car(args), Second(args));
+  return Le_OK;
+}
+
+static int evalPrimCar(LeVM* vm, Obj args) {
+  Obj xs = Car(args);
+  if (xs != nil && !le_is_pair(xs))
+    return le_raise_with(vm, Sym(InvalidArgs), args);
+  vm->result = Car(xs);
+  return Le_OK;
+}
+
+static int evalPrimCdr(LeVM* vm, Obj args) {
+  Obj xs = Car(args);
+  if (xs != nil && !le_is_pair(xs))
+    return le_raise_with(vm, Sym(InvalidArgs), args);
+  vm->result = Cdr(xs);
+  return Le_OK;
+}
+
+static int evalPrimSetCar(LeVM* vm, Obj args) {
+  Obj xs = Car(args);
+  Obj x  = Second(args);
+  if (xs != nil && !le_is_pair(xs))
+    return le_raise_with(vm, Sym(InvalidArgs), args);
+  SetCar(xs, x);
+  vm->result = xs;
+  return Le_OK;
+}
+
+static int evalPrimSetCdr(LeVM* vm, Obj args) {
+  Obj xs = Car(args);
+  Obj x  = Second(args);
+  if (xs != nil && !le_is_pair(xs))
+    return le_raise_with(vm, Sym(InvalidArgs), args);
+  SetCdr(xs, x);
+  vm->result = xs;
+  return Le_OK;
+}
+
+
 // ===== String =====
 
 static int evalPrimStr(LeVM* vm, Obj args) {
@@ -1801,6 +1851,11 @@ static int evalPair(LeVM* vm, Obj xs) {
   if (first == Sym(PrimArrayGet)) return evalPrimArrayGet(vm, args);
   if (first == Sym(PrimArraySet)) return evalPrimArraySet(vm, args);
   if (first == Sym(PrimArrayLen)) return evalPrimArrayLen(vm, args);
+  if (first == Sym(PrimCons))     return evalPrimCons(vm, args);
+  if (first == Sym(PrimCar))      return evalPrimCar(vm, args);
+  if (first == Sym(PrimCdr))      return evalPrimCdr(vm, args);
+  if (first == Sym(PrimSetCar))   return evalPrimSetCar(vm, args);
+  if (first == Sym(PrimSetCdr))   return evalPrimSetCdr(vm, args);
   if (first == Sym(PrimStr))      return evalPrimStr(vm, args);  
   if (first == Sym(PrimPutc))     return evalPrimPutc(vm, args);
   if (first == Sym(PrimGetc))     return evalPrimGetc(vm, args);

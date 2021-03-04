@@ -37,6 +37,15 @@
 (def array:len  (fn (Xs)     (%prim:array-len Xs)))
 
 
+;; Pair
+;; =====================================
+(def cons     (fn (A B) (%prim:cons A B)))
+(def car      (fn (Xs) (%prim:car Xs)))
+(def cdr      (fn (Xs) (%prim:cdr Xs)))
+(def set-car! (fn (Xs V) (%prim:set-car! Xs V)))
+(def set-cdr! (fn (Xs V) (%prim:set-cdr! Xs V)))
+
+
 ;; String
 ;; =====================================
 (def str (fn (S) (%prim:str S))) ;;TODO: concat
