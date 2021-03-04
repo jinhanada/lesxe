@@ -4,7 +4,7 @@
 (def -   (fn (A B) (%prim:sub A B)))
 (def *   (fn (A B) (%prim:mul A B)))
 (def /   (fn (A B) (%prim:div A B)))
-(def mod (fn (A B)) (%prim:mod A B))
+(def mod (fn (A B) (%prim:mod A B)))
 
 (def =   (fn (A B) (%prim:eq A B)))
 (def not (fn (x) (%prim:not x)))
@@ -27,6 +27,9 @@
 (def closure? (fn (X) (= (type-of X) 'closure)))
 (def bytes?   (fn (X) (= (type-of X) 'bytes)))
 (def string?  (fn (X) (= (type-of X) 'string)))
+
+(def hash-of
+     (fn (X) (%prim:hash X)))
 
 
 ;; Array
@@ -54,6 +57,8 @@
 
 ;; ===== Assoc (mutable) =====
 
+(def assoc:sign '<Assoc>)
+
 (def assoc:new
      (fn Args
        (let ((Xs Args) (Acc nil))
@@ -61,7 +66,7 @@
                 (set! Acc (cons (cons (car Xs) (second Xs))
                                 Acc))
                 (set! Xs (cddr Xs)))
-         (cons '<Assoc> Acc))))
+         (cons assoc:sign Acc))))
 
 (def assoc:ref
      (fn (Assoc Key)
@@ -87,6 +92,55 @@
              (set-cdr! Assoc (cons (cons Key Val)
                                    (cdr Assoc)))))
        Assoc))
+
+
+;; ===== Dict (mutable hash table) =====
+
+(def dict:sign '<Dict>)
+(def dict:default-size 63)
+
+(def dict:aux:entry
+     (fn (Dict Key)
+       (let ((Xs   (second Dict))
+             (Len  (array:len Xs))
+             (Hash (hash-of Key))
+             (I    (mod Hash Len)))
+         (array:get Xs I))))
+
+(def dict:aux:set
+     (fn (Xs Len Key Val)
+       (let ((Hash  (hash-of Key))
+             (I     (mod Hash Len))
+             (Assoc (array:get Xs I)))
+         (if Assoc
+             (assoc:set! Assoc Key Val)
+             (array:set! Xs I (assoc:new Key Val))))))
+
+(def dict:new
+     (fn Args
+       (let ((Args Args)
+             (Len dict:default-size)
+             (Xs (array:new Len)))
+         (while Args
+                (dict:aux:set Xs Len (car Args) (second Args))
+                (set! Args (cddr Args)))
+         (list dict:sign Xs))))
+
+(def dict:has?
+     (fn (Dict Key)
+       (if (dict:aux:entry Dict Key) true nil)))
+
+(def dict:get
+     (fn (Dict Key)
+       (let ((Assoc (dict:aux:entry Dict Key)))
+         (assoc:get Assoc Key))))
+
+(def dict:set!
+     (fn (Dict Key Val)
+       (let ((Xs (second Dict))
+             (Len (array:len Xs)))
+         (dict:aux:set Xs Len Key Val)
+         Dict)))
 
 
 ;; String
@@ -131,7 +185,7 @@
 ;; Macro System
 ;; =====================================
 
-(def MACRO-TABLE ())
+(def MACRO-TABLE (dict:new))
 
 (def expand-macro
      (fn (Expr) Expr))

@@ -38,7 +38,7 @@ enum {
       /* primitives */
       /* arithmetics */ SymPrimAdd, SymPrimSub, SymPrimMul, SymPrimDiv, SymPrimMod,
       /* compare */ SymPrimEq, SymPrimNot, SymPrimGt,
-      /* types */ SymPrimTypeOf,
+      /* types */ SymPrimTypeOf, SymPrimHash,
       /* array */ SymPrimArrayNew, SymPrimArrayGet, SymPrimArraySet, SymPrimArrayLen,
       /* pair */ SymPrimCons, SymPrimCar, SymPrimCdr, SymPrimSetCar, SymPrimSetCdr,
       /* string */ SymPrimStr,
@@ -1004,6 +1004,7 @@ static void setupSymbols(LeVM* vm) {
   DefSym(PrimNot,               "%prim:not");
   DefSym(PrimGt,                "%prim:gt");
   DefSym(PrimTypeOf,            "%prim:type-of");
+  DefSym(PrimHash,              "%prim:hash");
   DefSym(PrimArrayNew,          "%prim:array-new");
   DefSym(PrimArrayGet,          "%prim:array-get");
   DefSym(PrimArraySet,          "%prim:array-set!");
@@ -1347,37 +1348,39 @@ static int evalLet(LeVM* vm, Obj rest) {
   // (let ((var val) ...) expr ...)
   // env: ( ((var . val) ...) ... )
   SaveStack;
+  int env_i = Push(vm->env);
   Obj binds = Car(rest);
   Obj body = Cdr(rest);
   Push(body);
   int code = Le_OK;
 
-  Obj env = nil;
+  vm->env = le_cons(vm, nil, vm->env);
   while (binds) {
     Push(binds);
-    Push(env);
     Obj bind = Car(binds);
     Obj var = Car(bind);
     Obj val = Second(bind);
     Push(var);
     code = le_eval(vm, val);
-    if (code != Le_OK) RestoreReturn(code);
+    if (code != Le_OK) {
+      vm->env = le_stack_at(vm, env_i);
+      RestoreReturn(code);
+    }
 
     val = vm->result;
     var = Pop();
     // create bind var/val on env, as dotted pair
     bind = le_cons(vm, var, val);
-    env = Pop();
-    env = le_cons(vm, bind, env);
+    Obj env = le_cons(vm, bind, Car(vm->env));
+    SetCar(vm->env, env);
     // next
     binds = Cdr(Pop());
   }
-  env = le_reverse_inplace(env);
-  vm->env = le_cons(vm, env, vm->env);
   
   body = Pop();
   code = evalExprs(vm, body);
   // result or err is set on vm
+  vm->env = Pop();
   
   return code;
 }
@@ -1657,6 +1660,12 @@ static int evalPrimTypeOf(LeVM* vm, Obj args) {
   return Le_OK;
 }
 
+static int evalPrimHash(LeVM* vm, Obj args) {
+  Obj x = Car(args);
+  vm->result = le_get_hash(x);
+  return Le_OK;
+}
+
 
 // ===== Array =====
 
@@ -1847,6 +1856,7 @@ static int evalPair(LeVM* vm, Obj xs) {
   if (first == Sym(PrimNot))      return evalPrimNot(vm,  args);
   if (first == Sym(PrimGt))       return evalPrimGt(vm,   args);
   if (first == Sym(PrimTypeOf))   return evalPrimTypeOf(vm, args);
+  if (first == Sym(PrimHash))     return evalPrimHash(vm, args);
   if (first == Sym(PrimArrayNew)) return evalPrimArrayNew(vm, args);
   if (first == Sym(PrimArrayGet)) return evalPrimArrayGet(vm, args);
   if (first == Sym(PrimArraySet)) return evalPrimArraySet(vm, args);

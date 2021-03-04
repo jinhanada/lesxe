@@ -392,6 +392,12 @@ void test_eval_let(LeVM* vm) {
   x = vm->result;
   AssertOK;
   assert(le_obj2int(x) == 234);
+
+  // let*
+  code = le_eval_str(vm, "(let ((x 123) (y x)) y)");
+  x = vm->result;
+  AssertOK;
+  assert(le_obj2int(x) == 123);
 }
 
 void test_eval_fn(LeVM* vm) {
