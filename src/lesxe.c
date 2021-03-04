@@ -1473,51 +1473,51 @@ static int evalQuote(LeVM* vm, Obj xs) {
 
 #define ARITH_PROLOGUE                                                  \
   SaveStack;                                                            \
-  Obj a = Car(rest);                                                    \
-  Obj b = Second(rest);                                                 \
+  Obj a = Car(args);                                                    \
+  Obj b = Second(args);                                                 \
   if (!le_is_num(a) || !le_is_num(b))                                   \
-    return le_raise_with(vm, Sym(ExpectInteger), rest);                 \
+    return le_raise_with(vm, Sym(ExpectInteger), args);                 \
   int na = le_obj2int(a);                                               \
   int nb = le_obj2int(b);                                             
 
 
-static int evalPrimAdd(LeVM* vm, Obj rest) {
+static int evalPrimAdd(LeVM* vm, Obj args) {
   ARITH_PROLOGUE;
   Obj r = le_int2obj(na + nb);
   vm->result = r;
   return Le_OK;
 }
 
-static int evalPrimSub(LeVM* vm, Obj rest) {
+static int evalPrimSub(LeVM* vm, Obj args) {
   ARITH_PROLOGUE;
   Obj r = le_int2obj(na - nb);
   vm->result = r;
   return Le_OK;
 }
 
-static int evalPrimMul(LeVM* vm, Obj rest) {
+static int evalPrimMul(LeVM* vm, Obj args) {
   ARITH_PROLOGUE;
   Obj r = le_int2obj(na * nb);
   vm->result = r;
   return Le_OK;
 }
 
-static int evalPrimDiv(LeVM* vm, Obj rest) {
+static int evalPrimDiv(LeVM* vm, Obj args) {
   ARITH_PROLOGUE;
 
   if (nb == 0)
-    return le_raise_with(vm, Sym(ZeroDivision), rest);
+    return le_raise_with(vm, Sym(ZeroDivision), args);
 
   Obj r = le_int2obj(na / nb);
   vm->result = r;
   return Le_OK;
 }
 
-static int evalPrimMod(LeVM* vm, Obj rest) {
+static int evalPrimMod(LeVM* vm, Obj args) {
   ARITH_PROLOGUE;
 
   if (nb == 0)
-    return le_raise_with(vm, Sym(ZeroDivision), rest);
+    return le_raise_with(vm, Sym(ZeroDivision), args);
 
   Obj r = le_int2obj(na % nb);
   vm->result = r;
@@ -1527,28 +1527,28 @@ static int evalPrimMod(LeVM* vm, Obj rest) {
 
 // ===== Compare =====
 
-static int evalPrimEq(LeVM* vm, Obj rest) {
+static int evalPrimEq(LeVM* vm, Obj args) {
   SaveStack;
-  Obj a = Car(rest);
-  Obj b = Second(rest);
+  Obj a = Car(args);
+  Obj b = Second(args);
 
   vm->result = a == b ? Sym(True) : nil;
   return Le_OK;
 }
 
-static int evalPrimNot(LeVM* vm, Obj rest) {
-  Obj x = Car(rest);
+static int evalPrimNot(LeVM* vm, Obj args) {
+  Obj x = Car(args);
   vm->result = x == nil ? Sym(True) : nil;
   return Le_OK;
 }
 
-static int evalPrimGt(LeVM* vm, Obj rest) {
+static int evalPrimGt(LeVM* vm, Obj args) {
   SaveStack;
-  Obj a = Car(rest);
-  Obj b = Second(rest);
+  Obj a = Car(args);
+  Obj b = Second(args);
 
   if (!le_is_num(a) || !le_is_num(b))
-    return le_raise_with(vm, Sym(ExpectInteger), rest);
+    return le_raise_with(vm, Sym(ExpectInteger), args);
   int na = le_obj2int(a);
   int nb = le_obj2int(b);
   vm->result = na > nb ? Sym(True) : nil;
@@ -1592,18 +1592,18 @@ static int evalPrimStr(LeVM* vm, Obj args) {
 
 // ===== I/O =====
 
-static int evalPrimPutc(LeVM* vm, Obj rest) {
+static int evalPrimPutc(LeVM* vm, Obj args) {
   // (%prim:putc FileDescriptor Char) => Char
-  Obj var_fd   = Car(rest);
-  Obj var_char = Second(rest);
+  Obj var_fd   = Car(args);
+  Obj var_char = Second(args);
   if (!(le_is_num(var_fd) && le_is_num(var_char)))
-    return le_raise_with(vm, Sym(InvalidArgs), rest);
+    return le_raise_with(vm, Sym(InvalidArgs), args);
 
   int fd = le_obj2int(var_fd);
   char c = le_obj2int(var_char);
   FILE* fp = fdopen(fd, "w");
   if (fp == NULL)
-    return le_raise_with(vm, Sym(InvalidFileDescriptor), rest);
+    return le_raise_with(vm, Sym(InvalidFileDescriptor), args);
 
   putc(c, fp);
   fflush(fp);
@@ -1611,16 +1611,16 @@ static int evalPrimPutc(LeVM* vm, Obj rest) {
   return Le_OK;
 }
 
-static int evalPrimGetc(LeVM* vm, Obj rest) {
+static int evalPrimGetc(LeVM* vm, Obj args) {
   // (%prim:getc FileDescriptor) => char(integer)
-  Obj var_fd = Car(rest);
+  Obj var_fd = Car(args);
   if (!le_is_num(var_fd))
-    return le_raise_with(vm, Sym(InvalidArgs), rest);
+    return le_raise_with(vm, Sym(InvalidArgs), args);
 
   int fd = le_obj2int(var_fd);
   FILE* fp = fdopen(fd, "r");
   if (fp == NULL)
-    return le_raise_with(vm, Sym(InvalidFileDescriptor), rest);
+    return le_raise_with(vm, Sym(InvalidFileDescriptor), args);
 
   char c = getc(fp);
   vm->result = le_int2obj(c);
