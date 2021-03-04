@@ -853,6 +853,19 @@ static void toStrStr(Str* s, Obj x) {
   }
 }
 
+static void toStrArrayBody(Str* s, Obj xs) {
+  int len = le_array_len(xs);
+  if (len == 0) return;
+
+  toStrSub(s, xs->Array.data[0]);
+  
+  for (int i = 1; i < len; i++) {
+    putChar(s, ' ');
+    Obj x = xs->Array.data[i];
+    toStrSub(s, x);
+  }
+}
+
 static void toStrSub(Str* s, Obj x) {
   int t = le_typeof(x);
   switch (t) {
@@ -877,6 +890,10 @@ static void toStrSub(Str* s, Obj x) {
     return putStr(s, "\"");
   case Le_closure:
     return putStr(s, "#<CLOSURE>");
+  case Le_array:
+    putStr(s, "#<Array ");
+    toStrSub(s, le_int2obj(le_array_len(x)));
+    return putStr(s, ">");
   }
 
   if (t == Le_unknown)
