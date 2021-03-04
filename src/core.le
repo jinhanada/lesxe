@@ -29,6 +29,14 @@
 (def string?  (fn (X) (= (type-of X) 'string)))
 
 
+;; Array
+;; =====================================
+(def array:new  (fn (N)      (%prim:array-new N)))
+(def array:get  (fn (Xs I)   (%prim:array-get Xs I)))
+(def array:set! (fn (Xs I V) (%prim:array-set! Xs I V)))
+(def array:len  (fn (Xs)     (%prim:array-len Xs)))
+
+
 ;; String
 ;; =====================================
 (def str (fn (S) (%prim:str S))) ;;TODO: concat
