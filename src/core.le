@@ -1,10 +1,37 @@
 (def list (fn Xs Xs))
 
-(def + (fn (a b) (%prim:add a b)))
-(def - (fn (a b) (%prim:sub a b)))
-(def * (fn (a b) (%prim:mul a b)))
-(def / (fn (a b) (%prim:div a b)))
-(def mod (fn (a b)) (%prim:mod a b))
+(def +   (fn (A B) (%prim:add A B)))
+(def -   (fn (A B) (%prim:sub A B)))
+(def *   (fn (A B) (%prim:mul A B)))
+(def /   (fn (A B) (%prim:div A B)))
+(def mod (fn (A B)) (%prim:mod A B))
+
+(def =   (fn (A B) (%prim:eq A B)))
+(def not (fn (x) (%prim:not x)))
+
+(def >  (fn (A B) (%prim:gt A B)))
+(def >= (fn (A B) (if (= A B) true (> A B))))
+(def <  (fn (A B) (not (>= A B))))
+(def <= (fn (A B) (not (> A B))))
+
+
+;; Types
+;; =====================================
+(def type-of
+     (fn (X) (%prim:type-of X)))
+(def nil?     (fn (X) (not X)))
+(def number?  (fn (X) (= (type-of X) 'number)))
+(def array?   (fn (X) (= (type-of X) 'array)))
+(def symbol?  (fn (X) (= (type-of X) 'symbol)))
+(def pair?    (fn (X) (= (type-of X) 'pair)))
+(def closure? (fn (X) (= (type-of X) 'closure)))
+(def bytes?   (fn (X) (= (type-of X) 'bytes)))
+(def string?  (fn (X) (= (type-of X) 'string)))
+
+
+;; String
+;; =====================================
+(def str (fn (S) (%prim:str S))) ;;TODO: concat
 
 
 ;; I/O
@@ -30,6 +57,16 @@
 (def newline
      (fn () (putc c:newline)))
 
+(def io:print
+     (fn (FD S) (%prim:print FD S)))
+
+(def print
+     (fn (X)
+       (io:print FD-STDOUT
+                 (if (string? X) X (str X)))
+       (newline)
+       X))
+
 
 ;; Macro System
 ;; =====================================
@@ -37,8 +74,8 @@
 (def MACRO-TABLE ())
 
 (def expand-macro
-     (fn (expr) expr))
+     (fn (Expr) Expr))
 
 (set! %pre-eval
-      (fn (expr)
-        (expand-macro expr)))
+      (fn (Expr)
+        (expand-macro Expr)))

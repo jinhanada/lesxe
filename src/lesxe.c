@@ -31,10 +31,14 @@ enum {
       SymUnquote, SymUnquoteSplicing,
       SymLet, SymFn, SymDef, SymIf,
       SymSet, SymWhile, SymPreEval,
+
+      /* types */
+      SymNumber, SymArray, SymSymbol, SymPair, SymClosure, SymBytes, SymString,
       
       /* primitives */
       /* arithmetics */ SymPrimAdd, SymPrimSub, SymPrimMul, SymPrimDiv, SymPrimMod,
       /* compare */ SymPrimEq, SymPrimNot, SymPrimGt,
+      /* types */ SymPrimTypeOf,
       /* string */ SymPrimStr,
       /* i/o */ SymPrimPutc, SymPrimGetc, SymPrimPrint,
       
@@ -911,6 +915,14 @@ static void setupSymbols(LeVM* vm) {
   DefSym(Set,                   "set!");
   DefSym(While,                 "while");
   DefSym(PreEval,               "%pre-eval");
+  /* types */
+  DefSym(Number,                "number");
+  DefSym(Array,                 "array");
+  DefSym(Symbol,                "symbol");
+  DefSym(Pair,                  "pair");
+  DefSym(Closure,               "closure");
+  DefSym(Bytes,                 "bytes");
+  DefSym(String,                "string");  
   /* primitives */
   DefSym(PrimAdd,               "%prim:add");
   DefSym(PrimSub,               "%prim:sub");
@@ -920,10 +932,11 @@ static void setupSymbols(LeVM* vm) {
   DefSym(PrimEq,                "%prim:eq");
   DefSym(PrimNot,               "%prim:not");
   DefSym(PrimGt,                "%prim:gt");
+  DefSym(PrimTypeOf,            "%prim:type-of");
+  DefSym(PrimStr,               "%prim:str");
   DefSym(PrimPutc,              "%prim:putc");
   DefSym(PrimGetc,              "%prim:getc");
   DefSym(PrimPrint,             "%prim:print");
-  DefSym(PrimStr,               "%prim:str");
   /* errors */
   DefSym(Error,                 "error");
   DefSym(UndefinedSymbol,       "undefined-symbol");
@@ -937,10 +950,19 @@ static void setupSymbols(LeVM* vm) {
   DefSym(NotAProc,              "not-a-proc");
 }
 
+#define SetAsIs(symname) (setGlobal(vm, Sym(symname), Sym(symname)))
+
 static void setupVariables(LeVM* vm) {
   setGlobal(vm, Sym(Nil), nil);
-  setGlobal(vm, Sym(True), Sym(True));
   setGlobal(vm, Sym(PreEval), nil);
+  SetAsIs(True);
+  SetAsIs(Number);
+  SetAsIs(Array);
+  SetAsIs(Symbol);
+  SetAsIs(Pair);
+  SetAsIs(Closure);
+  SetAsIs(Bytes);
+  SetAsIs(String);
 }
 
 Public LeVM* le_new_vm(int cells) {
@@ -1384,8 +1406,9 @@ static int evalIf(LeVM* vm, Obj xs) {
   int code = eval(vm, cond);
   if (code != Le_OK) RestoreReturn(code);
 
-  Obj expr = Pop(); // then
-  if (vm->result == nil) { expr = Pop(); } // else
+  then = Pop(); // then
+  els  = Pop();
+  Obj expr = vm->result != nil ? then : els;
   return eval(vm, expr);
 }
 
@@ -1533,6 +1556,28 @@ static int evalPrimGt(LeVM* vm, Obj rest) {
 }
 
 
+// ===== Types =====
+
+static int evalPrimTypeOf(LeVM* vm, Obj args) {
+  // (%prim:type-of Obj) => Symbol
+  Obj x = Car(args);
+  int ty = le_typeof(x);
+  Obj r = nil;
+  switch (ty) {
+  case Le_nil:     r = Sym(Nil); break;
+  case Le_int:     r = Sym(Number); break;
+  case Le_array:   r = Sym(Array); break;
+  case Le_symbol:  r = Sym(Symbol); break;
+  case Le_pair:    r = Sym(Pair); break;
+  case Le_closure: r = Sym(Closure); break;
+  case Le_bytes:   r = Sym(Bytes); break;
+  case Le_string:  r = Sym(String); break;
+  }
+  vm->result = r;
+  return Le_OK;
+}
+
+
 // ===== String =====
 
 static int evalPrimStr(LeVM* vm, Obj args) {
@@ -1627,18 +1672,19 @@ static int evalPair(LeVM* vm, Obj xs) {
   Obj args = vm->result;
   first = Pop();
 
-  if (first == Sym(PrimAdd))   return evalPrimAdd(vm,  args);
-  if (first == Sym(PrimSub))   return evalPrimSub(vm,  args);
-  if (first == Sym(PrimMul))   return evalPrimMul(vm,  args);
-  if (first == Sym(PrimDiv))   return evalPrimDiv(vm,  args);
-  if (first == Sym(PrimMod))   return evalPrimMod(vm,  args);
-  if (first == Sym(PrimEq))    return evalPrimEq(vm,   args);
-  if (first == Sym(PrimNot))   return evalPrimNot(vm,  args);
-  if (first == Sym(PrimGt))    return evalPrimGt(vm,   args);
-  if (first == Sym(PrimStr))   return evalPrimStr(vm, args);  
-  if (first == Sym(PrimPutc))  return evalPrimPutc(vm, args);
-  if (first == Sym(PrimGetc))  return evalPrimGetc(vm, args);
-  if (first == Sym(PrimPrint)) return evalPrimPrint(vm, args);
+  if (first == Sym(PrimAdd))    return evalPrimAdd(vm,  args);
+  if (first == Sym(PrimSub))    return evalPrimSub(vm,  args);
+  if (first == Sym(PrimMul))    return evalPrimMul(vm,  args);
+  if (first == Sym(PrimDiv))    return evalPrimDiv(vm,  args);
+  if (first == Sym(PrimMod))    return evalPrimMod(vm,  args);
+  if (first == Sym(PrimEq))     return evalPrimEq(vm,   args);
+  if (first == Sym(PrimNot))    return evalPrimNot(vm,  args);
+  if (first == Sym(PrimGt))     return evalPrimGt(vm,   args);
+  if (first == Sym(PrimTypeOf)) return evalPrimTypeOf(vm, args);
+  if (first == Sym(PrimStr))    return evalPrimStr(vm, args);  
+  if (first == Sym(PrimPutc))   return evalPrimPutc(vm, args);
+  if (first == Sym(PrimGetc))   return evalPrimGetc(vm, args);
+  if (first == Sym(PrimPrint))  return evalPrimPrint(vm, args);
 
   // eval f
   Push(args);
