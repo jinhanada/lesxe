@@ -187,8 +187,18 @@
 
 (def MACRO-TABLE (dict:new))
 
+(def expand-macro-1
+     (fn (Expr Counter) Expr))
+
 (def expand-macro
-     (fn (Expr) Expr))
+     (fn (Expr)
+       (let ((X Expr)
+             (Count 1)
+             (Counter (fn () (set! Count (+ Count 1)))))
+         (while (> Count 0)
+                (set! Count 0)
+                (set! X (expand-macro-1 X Counter)))
+         X)))
 
 (set! %pre-eval
       (fn (Expr)

@@ -1361,7 +1361,7 @@ static int evalLet(LeVM* vm, Obj rest) {
     Obj var = Car(bind);
     Obj val = Second(bind);
     Push(var);
-    code = le_eval(vm, val);
+    code = eval(vm, val);
     if (code != Le_OK) {
       vm->env = le_stack_at(vm, env_i);
       RestoreReturn(code);
