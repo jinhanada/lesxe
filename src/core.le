@@ -45,6 +45,49 @@
 (def set-car! (fn (Xs V) (%prim:set-car! Xs V)))
 (def set-cdr! (fn (Xs V) (%prim:set-cdr! Xs V)))
 
+(def cadr (fn (Xs) (car (cdr Xs))))
+(def cddr (fn (Xs) (cdr (cdr Xs))))
+
+(def second (fn (Xs) (car (cdr Xs))))
+(def third  (fn (Xs) (car (cdr (cdr Xs)))))
+
+
+;; ===== Assoc (mutable) =====
+
+(def assoc:new
+     (fn Args
+       (let ((Xs Args) (Acc nil))
+         (while Xs
+                (set! Acc (cons (cons (car Xs) (second Xs))
+                                Acc))
+                (set! Xs (cddr Xs)))
+         (cons '<Assoc> Acc))))
+
+(def assoc:ref
+     (fn (Assoc Key)
+       (let ((Xs (cdr Assoc)) (R nil))
+         (while Xs
+                (let ((X (car Xs)))
+                  (if (= (car X) Key)
+                      (let ()
+                        (set! R X)
+                        (set! Xs nil))
+                      (set! Xs (cdr Xs)))))
+         R)))
+
+(def assoc:get
+     (fn (Assoc Key)
+       (cdr (assoc:ref Assoc Key))))
+
+(def assoc:set!
+     (fn (Assoc Key Val)
+       (let ((Ref (assoc:ref Assoc Key)))
+         (if Ref
+             (set-cdr! Ref Val)
+             (set-cdr! Assoc (cons (cons Key Val)
+                                   (cdr Assoc)))))
+       Assoc))
+
 
 ;; String
 ;; =====================================
