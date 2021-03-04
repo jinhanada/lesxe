@@ -31,11 +31,13 @@ enum {
       SymUnquote, SymUnquoteSplicing,
       SymLet, SymFn, SymDef, SymIf,
       SymSet, SymWhile, SymPreEval,
+      
       /* primitives */
-      SymPrimAdd, SymPrimSub,
-      SymPrimMul, SymPrimDiv, SymPrimMod,
-      SymPrimEq, SymPrimNot, SymPrimGt,
-      SymPrimPutc, SymPrimGetc,
+      /* arithmetics */ SymPrimAdd, SymPrimSub, SymPrimMul, SymPrimDiv, SymPrimMod,
+      /* compare */ SymPrimEq, SymPrimNot, SymPrimGt,
+      /* string */ SymPrimStr,
+      /* i/o */ SymPrimPutc, SymPrimGetc, SymPrimPrint,
+      
       /* errors */
       SymError, SymUndefinedSymbol,
       SymMalformedFn, SymInvalidArgs,
@@ -920,6 +922,8 @@ static void setupSymbols(LeVM* vm) {
   DefSym(PrimGt,                "%prim:gt");
   DefSym(PrimPutc,              "%prim:putc");
   DefSym(PrimGetc,              "%prim:getc");
+  DefSym(PrimPrint,             "%prim:print");
+  DefSym(PrimStr,               "%prim:str");
   /* errors */
   DefSym(Error,                 "error");
   DefSym(UndefinedSymbol,       "undefined-symbol");
@@ -1528,10 +1532,23 @@ static int evalPrimGt(LeVM* vm, Obj rest) {
   return Le_OK;
 }
 
+
+// ===== String =====
+
+static int evalPrimStr(LeVM* vm, Obj args) {
+  // (%prim:str Obj) => String
+  Obj x = Car(args);
+  char* s = toStr(x);
+  vm->result = le_new_str_from(vm, s);
+  free(s);
+  return Le_OK;
+}
+
+
 // ===== I/O =====
 
 static int evalPrimPutc(LeVM* vm, Obj rest) {
-  // (%prim:putc FileDescriptor Char) => FileDescriptor
+  // (%prim:putc FileDescriptor Char) => Char
   Obj var_fd   = Car(rest);
   Obj var_char = Second(rest);
   if (!(le_is_num(var_fd) && le_is_num(var_char)))
@@ -1545,13 +1562,13 @@ static int evalPrimPutc(LeVM* vm, Obj rest) {
 
   putc(c, fp);
   fflush(fp);
-  vm->result = var_fd;
+  vm->result = var_char;
   return Le_OK;
 }
 
 static int evalPrimGetc(LeVM* vm, Obj rest) {
   // (%prim:getc FileDescriptor) => char(integer)
-  Obj var_fd   = Car(rest);
+  Obj var_fd = Car(rest);
   if (!le_is_num(var_fd))
     return le_raise_with(vm, Sym(InvalidArgs), rest);
 
@@ -1562,6 +1579,26 @@ static int evalPrimGetc(LeVM* vm, Obj rest) {
 
   char c = getc(fp);
   vm->result = le_int2obj(c);
+  return Le_OK;
+}
+
+static int evalPrimPrint(LeVM* vm, Obj args) {
+  // (%prim:print FileDescriptor String) => String
+  Obj obj_fd = Car(args);
+  Obj str    = Second(args);
+  if (!(le_is_num(obj_fd) && le_is_string(str)))
+    return le_raise_with(vm, Sym(InvalidArgs), args);
+
+  int fd = le_obj2int(obj_fd);
+  FILE* fp = fdopen(fd, "w");
+  if (fp == NULL)
+    return le_raise_with(vm, Sym(InvalidFileDescriptor), args);
+
+  char* s = le_cstr_of(str);
+  fprintf(fp, "%s", s);
+  fflush(fp);
+  
+  vm->result = str;
   return Le_OK;
 }
 
@@ -1590,16 +1627,18 @@ static int evalPair(LeVM* vm, Obj xs) {
   Obj args = vm->result;
   first = Pop();
 
-  if (first == Sym(PrimAdd))  return evalPrimAdd(vm,  args);
-  if (first == Sym(PrimSub))  return evalPrimSub(vm,  args);
-  if (first == Sym(PrimMul))  return evalPrimMul(vm,  args);
-  if (first == Sym(PrimDiv))  return evalPrimDiv(vm,  args);
-  if (first == Sym(PrimMod))  return evalPrimMod(vm,  args);
-  if (first == Sym(PrimEq))   return evalPrimEq(vm,   args);
-  if (first == Sym(PrimNot))  return evalPrimNot(vm,  args);
-  if (first == Sym(PrimGt))   return evalPrimGt(vm,   args);
-  if (first == Sym(PrimPutc)) return evalPrimPutc(vm, args);
-  if (first == Sym(PrimGetc)) return evalPrimGetc(vm, args);
+  if (first == Sym(PrimAdd))   return evalPrimAdd(vm,  args);
+  if (first == Sym(PrimSub))   return evalPrimSub(vm,  args);
+  if (first == Sym(PrimMul))   return evalPrimMul(vm,  args);
+  if (first == Sym(PrimDiv))   return evalPrimDiv(vm,  args);
+  if (first == Sym(PrimMod))   return evalPrimMod(vm,  args);
+  if (first == Sym(PrimEq))    return evalPrimEq(vm,   args);
+  if (first == Sym(PrimNot))   return evalPrimNot(vm,  args);
+  if (first == Sym(PrimGt))    return evalPrimGt(vm,   args);
+  if (first == Sym(PrimStr))   return evalPrimStr(vm, args);  
+  if (first == Sym(PrimPutc))  return evalPrimPutc(vm, args);
+  if (first == Sym(PrimGetc))  return evalPrimGetc(vm, args);
+  if (first == Sym(PrimPrint)) return evalPrimPrint(vm, args);
 
   // eval f
   Push(args);
