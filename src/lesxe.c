@@ -39,6 +39,7 @@ enum {
       /* arithmetics */ SymPrimAdd, SymPrimSub, SymPrimMul, SymPrimDiv, SymPrimMod,
       /* compare */ SymPrimEq, SymPrimNot, SymPrimGt,
       /* types */ SymPrimTypeOf,
+      /* array */ SymPrimArrayNew, SymPrimArrayGet, SymPrimArraySet, SymPrimArrayLen,
       /* string */ SymPrimStr,
       /* i/o */ SymPrimPutc, SymPrimGetc, SymPrimPrint,
       
@@ -594,6 +595,17 @@ static Obj newRoot(LeVM* vm) {
 }
 
 
+// ===== Array =====
+
+Public Obj le_new_array(LeVM* vm, int len) {
+  return newObj(vm, len, T_ARRAY);
+}
+
+Public int le_array_len(Obj xs) {
+  return cellsOf(xs->header);
+}
+
+
 // ===== Pair =====
 
 Public Obj le_cons(LeVM* vm, Obj a, Obj b) {
@@ -974,6 +986,10 @@ static void setupSymbols(LeVM* vm) {
   DefSym(PrimNot,               "%prim:not");
   DefSym(PrimGt,                "%prim:gt");
   DefSym(PrimTypeOf,            "%prim:type-of");
+  DefSym(PrimArrayNew,          "%prim:array-new");
+  DefSym(PrimArrayGet,          "%prim:array-get");
+  DefSym(PrimArraySet,          "%prim:array-set!");
+  DefSym(PrimArrayLen,          "%prim:array-len");
   DefSym(PrimStr,               "%prim:str");
   DefSym(PrimPutc,              "%prim:putc");
   DefSym(PrimGetc,              "%prim:getc");
@@ -1619,6 +1635,48 @@ static int evalPrimTypeOf(LeVM* vm, Obj args) {
 }
 
 
+// ===== Array =====
+
+static int evalPrimArrayNew(LeVM* vm, Obj args) {
+  Obj x = Car(args);
+  if (!le_is_num(x))
+    return le_raise_with(vm, Sym(InvalidArgs), args);
+  int len = le_obj2int(x);
+  vm->result = le_new_array(vm, len);
+  return Le_OK;
+}
+
+static int evalPrimArrayGet(LeVM* vm, Obj args) {
+  Obj xs = Car(args);
+  Obj obj_i  = Second(args);
+  if (!(le_is_array(xs) && le_is_num(obj_i)))
+    return le_raise_with(vm, Sym(InvalidArgs), args);
+  int i = le_obj2int(obj_i);
+  vm->result = xs->Array.data[i];
+  return Le_OK;
+}
+
+static int evalPrimArraySet(LeVM* vm, Obj args) {
+  Obj xs = Car(args);
+  Obj obj_i  = Second(args);
+  Obj val = Third(args);
+  if (!(le_is_array(xs) && le_is_num(obj_i)))
+    return le_raise_with(vm, Sym(InvalidArgs), args);
+  int i = le_obj2int(obj_i);
+  xs->Array.data[i] = val;
+  vm->result = xs;
+  return Le_OK;
+}
+
+static int evalPrimArrayLen(LeVM* vm, Obj args) {
+  Obj xs = Car(args);
+  if (!le_is_array(xs))
+    return le_raise_with(vm, Sym(InvalidArgs), args);
+  vm->result = le_int2obj(le_array_len(xs));
+  return Le_OK;
+}
+
+
 // ===== String =====
 
 static int evalPrimStr(LeVM* vm, Obj args) {
@@ -1713,19 +1771,23 @@ static int evalPair(LeVM* vm, Obj xs) {
   Obj args = vm->result;
   first = Pop();
 
-  if (first == Sym(PrimAdd))    return evalPrimAdd(vm,  args);
-  if (first == Sym(PrimSub))    return evalPrimSub(vm,  args);
-  if (first == Sym(PrimMul))    return evalPrimMul(vm,  args);
-  if (first == Sym(PrimDiv))    return evalPrimDiv(vm,  args);
-  if (first == Sym(PrimMod))    return evalPrimMod(vm,  args);
-  if (first == Sym(PrimEq))     return evalPrimEq(vm,   args);
-  if (first == Sym(PrimNot))    return evalPrimNot(vm,  args);
-  if (first == Sym(PrimGt))     return evalPrimGt(vm,   args);
-  if (first == Sym(PrimTypeOf)) return evalPrimTypeOf(vm, args);
-  if (first == Sym(PrimStr))    return evalPrimStr(vm, args);  
-  if (first == Sym(PrimPutc))   return evalPrimPutc(vm, args);
-  if (first == Sym(PrimGetc))   return evalPrimGetc(vm, args);
-  if (first == Sym(PrimPrint))  return evalPrimPrint(vm, args);
+  if (first == Sym(PrimAdd))      return evalPrimAdd(vm,  args);
+  if (first == Sym(PrimSub))      return evalPrimSub(vm,  args);
+  if (first == Sym(PrimMul))      return evalPrimMul(vm,  args);
+  if (first == Sym(PrimDiv))      return evalPrimDiv(vm,  args);
+  if (first == Sym(PrimMod))      return evalPrimMod(vm,  args);
+  if (first == Sym(PrimEq))       return evalPrimEq(vm,   args);
+  if (first == Sym(PrimNot))      return evalPrimNot(vm,  args);
+  if (first == Sym(PrimGt))       return evalPrimGt(vm,   args);
+  if (first == Sym(PrimTypeOf))   return evalPrimTypeOf(vm, args);
+  if (first == Sym(PrimArrayNew)) return evalPrimArrayNew(vm, args);
+  if (first == Sym(PrimArrayGet)) return evalPrimArrayGet(vm, args);
+  if (first == Sym(PrimArraySet)) return evalPrimArraySet(vm, args);
+  if (first == Sym(PrimArrayLen)) return evalPrimArrayLen(vm, args);
+  if (first == Sym(PrimStr))      return evalPrimStr(vm, args);  
+  if (first == Sym(PrimPutc))     return evalPrimPutc(vm, args);
+  if (first == Sym(PrimGetc))     return evalPrimGetc(vm, args);
+  if (first == Sym(PrimPrint))    return evalPrimPrint(vm, args);
 
   // eval f
   Push(args);

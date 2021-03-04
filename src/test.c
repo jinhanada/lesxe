@@ -584,6 +584,20 @@ void test_eval_pre_eval(LeVM* vm) {
   assert(le_obj2int(x) == 123);
 }
 
+// Primitives
+// =============================================================================
+void test_prim_array(LeVM* vm) {
+  char* src =
+    "(let ((Xs (%prim:array-new 42)))"
+    "  (%prim:array-set! Xs 41 123)"
+    "  (%prim:add (%prim:array-get Xs 41)"
+    "             (%prim:array-len Xs)))"
+    ;
+  int code = le_eval_str(vm, src);
+  AssertOK;
+  assert(le_obj2int(vm->result) == 123 + 42);
+}
+
 #define test(Name) { printf("%-30s ", #Name); test_##Name(); printf("ok\n"); }
 #define testVM(Name) {                          \
     printf("%-30s ", #Name);                    \
@@ -621,6 +635,8 @@ void test_all() {
   testVM(eval_predefined_symbols);
   testVM(eval_quote);
   testVM(eval_pre_eval);
+  // primitives
+  testVM(prim_array);
 }
 
 

@@ -62,6 +62,9 @@ void   le_restore_stack(LeVM* vm, int index);
 
 // Data Types
 // =============================================================================
+LeObj* le_new_array(LeVM* vm, int len);
+int    le_array_len(LeObj* xs);
+
 LeObj* le_cons(LeVM* vm, LeObj* a, LeObj* b);
 LeObj* le_car(LeObj* xs);
 LeObj* le_cdr(LeObj* xs);
