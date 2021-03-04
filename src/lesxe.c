@@ -383,6 +383,10 @@ Public Obj le_get_hash(Obj obj) {
   if (obj == nil) return le_int2obj(0);
   if (le_is_num(obj)) return obj;
 
+  // already have hash
+  if (obj->hash != nil) return obj->hash;
+
+  // string
   if (le_is_string(obj)) {
     Cell h = hashDJB2(le_cstr_of(obj));
     Obj hash = le_int2obj(h);
@@ -391,11 +395,6 @@ Public Obj le_get_hash(Obj obj) {
   }
 
   // normal object
-  
-  // already have hash
-  if (obj->hash != nil) return obj->hash;
-
-  // calculate hash
   Cell h = ((Cell)obj) >> 3;
   Obj hash = le_int2obj(h);
   obj->hash = hash;
