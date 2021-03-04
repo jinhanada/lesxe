@@ -35,11 +35,13 @@ enum {
       SymPrimAdd, SymPrimSub,
       SymPrimMul, SymPrimDiv, SymPrimMod,
       SymPrimEq, SymPrimNot, SymPrimGt,
+      SymPrimPutc, SymPrimGetc,
       /* errors */
       SymError, SymUndefinedSymbol,
       SymMalformedFn, SymInvalidArgs,
       SymExpectInteger, SymZeroDivision,
       SymFileNotFound, SymInvalidPreEvalProc,
+      SymInvalidFileDescriptor, SymNotAProc,
 
       SymTableSize
 };
@@ -894,43 +896,47 @@ static void setGlobal(LeVM* vm, Obj var, Obj val) {
 #define DefSym(index, name) (vm->symTable[Sym##index] = le_new_sym_from(vm, name))
 
 static void setupSymbols(LeVM* vm) {
-  DefSym(Nil,                "nil");
-  DefSym(True,               "true");
-  DefSym(Quote,              "quote");
-  DefSym(Backquote,          "backquote");
-  DefSym(Unquote,            "unquote");
-  DefSym(UnquoteSplicing,    "unquote-splicing");
-  DefSym(Let,                "let");
-  DefSym(Fn,                 "fn");
-  DefSym(Def,                "def");
-  DefSym(If,                 "if");
-  DefSym(Set,                "set!");
-  DefSym(While,              "while");
-  DefSym(PreEval,            "%pre-eval");
+  DefSym(Nil,                   "nil");
+  DefSym(True,                  "true");
+  DefSym(Quote,                 "quote");
+  DefSym(Backquote,             "backquote");
+  DefSym(Unquote,               "unquote");
+  DefSym(UnquoteSplicing,       "unquote-splicing");
+  DefSym(Let,                   "let");
+  DefSym(Fn,                    "fn");
+  DefSym(Def,                   "def");
+  DefSym(If,                    "if");
+  DefSym(Set,                   "set!");
+  DefSym(While,                 "while");
+  DefSym(PreEval,               "%pre-eval");
   /* primitives */
-  DefSym(PrimAdd,            "%prim:add");
-  DefSym(PrimSub,            "%prim:sub");
-  DefSym(PrimMul,            "%prim:mul");
-  DefSym(PrimDiv,            "%prim:div");
-  DefSym(PrimMod,            "%prim:mod");
-  DefSym(PrimEq,             "%prim:eq");
-  DefSym(PrimNot,            "%prim:not");
-  DefSym(PrimGt,             "%prim:gt");
+  DefSym(PrimAdd,               "%prim:add");
+  DefSym(PrimSub,               "%prim:sub");
+  DefSym(PrimMul,               "%prim:mul");
+  DefSym(PrimDiv,               "%prim:div");
+  DefSym(PrimMod,               "%prim:mod");
+  DefSym(PrimEq,                "%prim:eq");
+  DefSym(PrimNot,               "%prim:not");
+  DefSym(PrimGt,                "%prim:gt");
+  DefSym(PrimPutc,              "%prim:putc");
+  DefSym(PrimGetc,              "%prim:getc");
   /* errors */
-  DefSym(Error,              "error");
-  DefSym(UndefinedSymbol,    "undefined-symbol");
-  DefSym(MalformedFn,        "malformed-fn");
-  DefSym(InvalidArgs,        "invalid-args");
-  DefSym(ExpectInteger,      "expect-integer");
-  DefSym(ZeroDivision,       "zero-division");
-  DefSym(FileNotFound,       "file-not-found");
-  DefSym(InvalidPreEvalProc, "invalid-pre-eval-proc");  
+  DefSym(Error,                 "error");
+  DefSym(UndefinedSymbol,       "undefined-symbol");
+  DefSym(MalformedFn,           "malformed-fn");
+  DefSym(InvalidArgs,           "invalid-args");
+  DefSym(ExpectInteger,         "expect-integer");
+  DefSym(ZeroDivision,          "zero-division");
+  DefSym(FileNotFound,          "file-not-found");
+  DefSym(InvalidPreEvalProc,    "invalid-pre-eval-proc");
+  DefSym(InvalidFileDescriptor, "invalid-file-descriptor");
+  DefSym(NotAProc,              "not-a-proc");
 }
 
 static void setupVariables(LeVM* vm) {
   setGlobal(vm, Sym(Nil), nil);
   setGlobal(vm, Sym(True), Sym(True));
-  setGlobal(vm, Sym(PreEval), nil);  
+  setGlobal(vm, Sym(PreEval), nil);
 }
 
 Public LeVM* le_new_vm(int cells) {
@@ -1274,7 +1280,7 @@ static int evalFn(LeVM* vm, Obj rest) {
   if (!le_is_pair(rest)) return le_raise_with(vm, Sym(MalformedFn), rest);
   Obj binds = Car(rest);
   Obj body = Cdr(rest);
-  if (!le_is_pair(binds) && !le_is_symbol(binds))
+  if (binds != nil && !le_is_pair(binds) && !le_is_symbol(binds))
     return le_raise_with(vm, Sym(MalformedFn), rest);
 
   Obj f = le_new_closure(vm, body, vm->env, binds);
@@ -1557,6 +1563,43 @@ static int evalPrimGt(LeVM* vm, Obj rest) {
   return Le_OK;
 }
 
+// ===== I/O =====
+
+static int evalPrimPutc(LeVM* vm, Obj rest) {
+  // (%prim:putc FileDescriptor Char) => FileDescriptor
+  Obj var_fd   = Car(rest);
+  Obj var_char = Second(rest);
+  if (!(le_is_num(var_fd) && le_is_num(var_char)))
+    return le_raise_with(vm, Sym(InvalidArgs), rest);
+
+  int fd = le_obj2int(var_fd);
+  char c = le_obj2int(var_char);
+  FILE* fp = fdopen(fd, "w");
+  if (fp == NULL)
+    return le_raise_with(vm, Sym(InvalidFileDescriptor), rest);
+
+  putc(c, fp);
+  fflush(fp);
+  vm->result = var_fd;
+  return Le_OK;
+}
+
+static int evalPrimGetc(LeVM* vm, Obj rest) {
+  // (%prim:getc FileDescriptor) => char(integer)
+  Obj var_fd   = Car(rest);
+  if (!le_is_num(var_fd))
+    return le_raise_with(vm, Sym(InvalidArgs), rest);
+
+  int fd = le_obj2int(var_fd);
+  FILE* fp = fdopen(fd, "r");
+  if (fp == NULL)
+    return le_raise_with(vm, Sym(InvalidFileDescriptor), rest);
+
+  char c = getc(fp);
+  vm->result = le_int2obj(c);
+  return Le_OK;
+}
+
 
 // ===== Pair =====
 
@@ -1564,35 +1607,43 @@ static int evalPair(LeVM* vm, Obj xs) {
   SaveStack;
   Obj first = Car(xs);
   Obj rest  = Cdr(xs);
-  if (first == Sym(Let)) return evalLet(vm, rest);
-  if (first == Sym(Fn)) return evalFn(vm, rest);
-  if (first == Sym(Def)) return evalDef(vm, rest);
-  if (first == Sym(If)) return evalIf(vm, rest);
-  if (first == Sym(Set)) return evalSet(vm, rest);
-  if (first == Sym(While)) return evalWhile(vm, rest);
-  if (first == Sym(Quote)) return evalQuote(vm, rest);
-  if (first == Sym(PrimAdd)) return evalPrimAdd(vm, rest);
-  if (first == Sym(PrimSub)) return evalPrimSub(vm, rest);
-  if (first == Sym(PrimMul)) return evalPrimMul(vm, rest);
-  if (first == Sym(PrimDiv)) return evalPrimDiv(vm, rest);
-  if (first == Sym(PrimMod)) return evalPrimMod(vm, rest);
-  if (first == Sym(PrimEq)) return evalPrimEq(vm, rest);
-  if (first == Sym(PrimNot)) return evalPrimNot(vm, rest);
-  if (first == Sym(PrimGt)) return evalPrimGt(vm, rest);
+  int code;
 
-  int code = eval(vm, first);
-  ExpectOK;
-  Obj f = vm->result;
-  Push(f);
+  // Syntax
+  if (first == Sym(Let))      return evalLet(vm, rest);
+  if (first == Sym(Fn))       return evalFn(vm, rest);
+  if (first == Sym(Def))      return evalDef(vm, rest);
+  if (first == Sym(If))       return evalIf(vm, rest);
+  if (first == Sym(Set))      return evalSet(vm, rest);
+  if (first == Sym(While))    return evalWhile(vm, rest);
+  if (first == Sym(Quote))    return evalQuote(vm, rest);
 
+  Push(first);
   code = evalArgs(vm, rest);
   if (code != Le_OK) RestoreReturn(code);
   Obj args = vm->result;
-  f = Pop();
+  first = Pop();
+
+  if (first == Sym(PrimAdd))  return evalPrimAdd(vm,  rest);
+  if (first == Sym(PrimSub))  return evalPrimSub(vm,  rest);
+  if (first == Sym(PrimMul))  return evalPrimMul(vm,  rest);
+  if (first == Sym(PrimDiv))  return evalPrimDiv(vm,  rest);
+  if (first == Sym(PrimMod))  return evalPrimMod(vm,  rest);
+  if (first == Sym(PrimEq))   return evalPrimEq(vm,   rest);
+  if (first == Sym(PrimNot))  return evalPrimNot(vm,  rest);
+  if (first == Sym(PrimGt))   return evalPrimGt(vm,   rest);
+  if (first == Sym(PrimPutc)) return evalPrimPutc(vm, args);
+  if (first == Sym(PrimGetc)) return evalPrimGetc(vm, args);
+
+  Push(args);
+  code = eval(vm, first);
+  ExpectOK;
+  Obj f = vm->result;
+  args = Pop();  
 
   if (le_is_closure(f)) return applyClosure(vm, f, args);
 
-  DIE("STUB apply primitive");
+  return le_raise_with(vm, Sym(NotAProc), f);
 }
 
 
@@ -1689,6 +1740,7 @@ Public int le_load_file(LeVM* vm, char* fname) {
     if (code == Le_EOF) break;
     ExpectOK;
     code = le_eval(vm, vm->result);
+    ExpectOK;
   }
 
   free(src);

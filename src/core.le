@@ -7,6 +7,30 @@
 (def mod (fn (a b)) (%prim:mod a b))
 
 
+;; I/O
+;; =====================================
+(def FD-STDIN  0)
+(def FD-STDOUT 1)
+(def FD-STDERR 2)
+
+(def io:getc
+     (fn (FD) (%prim:getc FD)))
+
+(def io:putc
+     (fn (FD C) (%prim:putc FD C)))
+
+(def getc
+     (fn () (%prim:getc FD-STDIN)))
+
+(def putc
+     (fn (C) (%prim:putc FD-STDOUT C)))
+
+(def c:newline 10)
+
+(def newline
+     (fn () (putc c:newline)))
+
+
 ;; Macro System
 ;; =====================================
 
