@@ -445,6 +445,16 @@
     `(let ,Defs ,@Sets ,@Body)))
 
 
+;; Gensym
+;; =====================================
+(def sym:GENSYM-COUNTER
+     (let ((I 0))
+       (fn () (set! I (+ I 1)))))
+
+(de (sym:gen)
+  (sym:new (str "#g:" (sym:GENSYM-COUNTER))))
+
+
 ;; System
 ;; =====================================
 
