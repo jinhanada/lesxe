@@ -382,6 +382,7 @@ static Cell hashDJB2(char* s) {
 }
 
 Public Obj le_get_hash(Obj obj) {
+  // hash could be a negative integer
   if (obj == nil) return le_int2obj(0);
   if (le_is_num(obj)) return obj;
 
@@ -2008,6 +2009,7 @@ Public int le_load_file(LeVM* vm, char* fname) {
   vm->src = src;
   vm->p   = src;
   int code = Le_OK;
+  int i = 0;
   while (code == Le_OK && *vm->p != '\0') {
     code = readExpr(vm);
     if (code == Le_EOF) break;
@@ -2042,12 +2044,13 @@ static int replGets(char* buf, int max) {
 static int replRead(LeVM* vm, char* buf, int max) {
   char* p = buf;
   int len = replGets(p, max);
-  if (len < 0) return Le_EOF;
+  if (len < 0) return Le_EOF; // Ctrl-D
   max = max - len;
   p += len;
 
   int code = le_read_str(vm, buf);
-
+  if (code == Le_EOF) return Le_Continue; // 空白のみの入力だった
+  
   while (code == Le_Continue) {
     if (max < 1) DIE("repl buffer exausted");
     
@@ -2071,7 +2074,8 @@ Public int le_repl(LeVM* vm) {
     replPrompt(vm);
 
     int code = replRead(vm, buf, REPL_BUF_LEN);
-    if (code == Le_EOF) return Le_OK;
+    if (code == Le_Continue) continue; // 空白のみの入力
+    if (code == Le_EOF)      break;    // Ctrl-D 
     if (code != Le_OK) {
       DBG("%s", vm->err);
       continue;

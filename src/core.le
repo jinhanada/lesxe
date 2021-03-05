@@ -14,6 +14,8 @@
 (def <  (fn (A B) (not (>= A B))))
 (def <= (fn (A B) (not (> A B))))
 
+(def abs (fn (N) (if (> 0 N) (- 0 N) N)))
+
 
 ;; Types
 ;; =====================================
@@ -113,18 +115,21 @@
 (def dict:sign '<Dict>)
 (def dict:default-size 63)
 
+(def dict:aux:index
+     (fn (Xs Key)
+       (let ((Len  (array:len Xs))
+             (Hash (hash-of Key)))
+         (mod (abs Hash) Len))))
+
 (def dict:aux:entry
      (fn (Dict Key)
        (let ((Xs   (second Dict))
-             (Len  (array:len Xs))
-             (Hash (hash-of Key))
-             (I    (mod Hash Len)))
+             (I    (dict:aux:index Xs Key)))
          (array:get Xs I))))
 
 (def dict:aux:set
-     (fn (Xs Len Key Val)
-       (let ((Hash  (hash-of Key))
-             (I     (mod Hash Len))
+     (fn (Xs Key Val)
+       (let ((I     (dict:aux:index Xs Key))
              (Assoc (array:get Xs I)))
          (if Assoc
              (assoc:set! Assoc Key Val)
@@ -136,7 +141,7 @@
              (Len dict:default-size)
              (Xs (array:new Len)))
          (while Args
-                (dict:aux:set Xs Len (car Args) (second Args))
+                (dict:aux:set Xs (car Args) (second Args))
                 (set! Args (cddr Args)))
          (list dict:sign Xs))))
 
@@ -151,9 +156,8 @@
 
 (def dict:set!
      (fn (Dict Key Val)
-       (let ((Xs (second Dict))
-             (Len (array:len Xs)))
-         (dict:aux:set Xs Len Key Val)
+       (let ((Xs (second Dict)))
+         (dict:aux:set Xs Key Val)
          Dict)))
 
 

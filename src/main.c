@@ -10,6 +10,7 @@ static void debugPrint(char* filename, int line, char* fmt, ...) {
   fprintf(stderr, "\e[0m\n");
 }
 
+
 #define DBG(...)  { debugPrint(__FILE__, __LINE__, __VA_ARGS__); }
 #define DIE(...) { DBG(__VA_ARGS__) exit(1); }
 
@@ -27,6 +28,8 @@ int main(int argc, char** argv) {
   le_repl(vm);
   
   le_free_vm(vm);
+
+  printf("bye!\n");
  
   return 0;
 }
