@@ -62,6 +62,12 @@
                  (list:map (cdr Xs) F))
            nil)))
 
+(def list:concat
+     (fn (Xs Ys)
+       (if Xs
+           (cons (car Xs) (list:concat (cdr Xs) Ys))
+           Ys)))
+
 
 ;; ===== Assoc (mutable) =====
 
@@ -195,8 +201,12 @@
 
 (def macro:SYNTAX-DICT (dict:new))
 (def macro:MACRO-DICT (dict:new))
+(def macro:DEBUG nil)
 
 (def expand-macro-1 nil) ;; for recursion
+
+
+;; ===== Syntax =====
 
 (def macro:aux-rec
      (fn (Counter)
@@ -275,6 +285,9 @@
            (F (car Expr))
            (F (second Expr))))))
 
+
+;; ===== demac =====
+
 (dict:set!
  macro:MACRO-DICT
  'demac
@@ -286,6 +299,9 @@
      (list 'dict:set! 'macro:MACRO-DICT
            (cons 'quote Name)
            (cons 'fn (cons Args Body))))))
+
+
+;; ===== expand =====
 
 (set! expand-macro-1
       (fn (Counter Expr)
@@ -316,7 +332,9 @@
 
 (set! %pre-eval
       (fn (Expr)
-        (expand-macro Expr)))
+        (let ((Expanded (expand-macro Expr)))
+          (if macro:DEBUG (print (list 'expanded Expanded)))
+          Expanded)))
 
 
 ;; Macros
@@ -327,3 +345,70 @@
     (list 'def
           Name
           (cons 'fn (cons Args Body)))))
+
+
+(demac (and . Xs)
+  (let ((rec nil))
+    (set! rec
+          (fn (Xs)
+            (if Xs
+                (list 'if (car Xs) (cons 'and (cdr Xs)) nil)
+                true)))
+    (rec Xs)))
+
+(demac (or . Xs)
+  (let ((rec nil))
+    (set! rec
+          (fn (Xs)
+            (if Xs
+                (list 'if (car Xs) true (cons 'or (cdr Xs)))
+                nil)))
+    (rec Xs)))
+
+
+;; Simple quasiquote expander
+;; Do not nest.
+(demac (quasiquote . Expr)
+  (let ((qq-object nil)
+        (qq-pair nil)
+        (qq-list nil))
+    (set!
+     qq-object
+     (fn (X)
+       (if (pair? X)
+           (qq-list X)
+           (cons 'quote X))))
+    (set!
+     qq-pair
+     (fn (Xs)
+       (if (= (car Xs) 'unquote)
+           (cdr Xs)
+           (qq-list Xs))))
+    (set!
+     qq-list
+     (fn (Xs)
+       (if (pair? Xs)
+           (let ((F    (car Xs))
+                 (Rest (cdr Xs)))
+             (if (= F 'unquote)
+                 ;; Xs: (unquote . Rest)
+                 Rest
+                 (if (and (pair? F)
+                          (= (car F) 'unquote-splicing))
+                     ;; Xs: ((unquote-splicing . X) . Rest)
+                     (list 'list:concat (cdr F) (qq-list Rest))
+                     (list 'cons (qq-object F) (qq-list Rest)))))
+           (cons 'quote Xs))))
+    (qq-object Expr)))
+
+
+(demac (letrec Binds . Body)
+  ;; (letrec ((F Fn) ...) . Body)
+  ;; => (let ((F nil)) (set! F Fn) . Body)
+  (let ((Defs (list:map Binds (fn (X) `(,(car X) nil))))
+        (Sets (list:map Binds (fn (X) `(set! ,(car X) ,(second X))))))
+    `(let ,Defs ,@Sets ,@Body)))
+
+
+;; (set! macro:DEBUG true)
+

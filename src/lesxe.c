@@ -27,7 +27,7 @@
 enum {
       SymNil = 0,
       SymTrue,
-      SymQuote, SymBackquote,
+      SymQuote, SymQuasiquote,
       SymUnquote, SymUnquoteSplicing,
       SymLet, SymFn, SymDef, SymIf,
       SymSet, SymWhile, SymApply, SymPreEval,
@@ -976,7 +976,7 @@ static void setupSymbols(LeVM* vm) {
   DefSym(Nil,                   "nil");
   DefSym(True,                  "true");
   DefSym(Quote,                 "quote");
-  DefSym(Backquote,             "backquote");
+  DefSym(Quasiquote,             "quasiquote");
   DefSym(Unquote,               "unquote");
   DefSym(UnquoteSplicing,       "unquote-splicing");
   DefSym(Let,                   "let");
@@ -1269,6 +1269,28 @@ static int readQuote(LeVM* vm) {
   return Le_OK;
 }
 
+static int readQuasiquote(LeVM* vm) {
+  vm->p++; // skip quasiquote
+  int code = readExpr(vm);
+  ExpectOK;
+
+  vm->result = Cons(vm, Sym(Quasiquote), vm->result);
+  return Le_OK;
+}
+
+static int readUnquote(LeVM* vm) {
+  vm->p++; // skip unquote
+  int splicing = *vm->p == '@';
+  if (splicing) vm->p++; // skip @
+
+  int code = readExpr(vm);
+  ExpectOK;
+
+  Obj sym = splicing ? Sym(UnquoteSplicing) : Sym(Unquote);
+  vm->result = Cons(vm, sym, vm->result);
+  return Le_OK;
+}
+
 static int readExpr(LeVM* vm) {
   // vm->p should be set
   
@@ -1282,6 +1304,8 @@ static int readExpr(LeVM* vm) {
   if (c == '(')  return readList(vm);
   if (c == '"')  return readStr(vm);
   if (c == '\'') return readQuote(vm);
+  if (c == '`')  return readQuasiquote(vm);
+  if (c == ',')  return readUnquote(vm);
 
   return readSym(vm);
 }
