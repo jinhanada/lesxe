@@ -343,7 +343,7 @@
 
 ;; Macros
 
-(demac (defn Def . Body)
+(demac (de Def . Body)
   (let ((Name (car Def))
         (Args (cdr Def)))
     (list 'def
@@ -414,5 +414,8 @@
     `(let ,Defs ,@Sets ,@Body)))
 
 
-;; (set! macro:DEBUG true)
+;; System
+;; =====================================
 
+(de (exit Code)
+  (%prim:exit (if Code Code 0)))

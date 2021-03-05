@@ -43,6 +43,7 @@ enum {
       /* pair */ SymPrimCons, SymPrimCar, SymPrimCdr, SymPrimSetCar, SymPrimSetCdr,
       /* string */ SymPrimStr,
       /* i/o */ SymPrimPutc, SymPrimGetc, SymPrimPrint,
+      /* system */ SymPrimExit,
       
       /* errors */
       SymError, SymUndefinedSymbol,
@@ -1027,6 +1028,7 @@ static void setupSymbols(LeVM* vm) {
   DefSym(PrimPutc,              "%prim:putc");
   DefSym(PrimGetc,              "%prim:getc");
   DefSym(PrimPrint,             "%prim:print");
+  DefSym(PrimExit,              "%prim:exit");
   /* errors */
   DefSym(Error,                 "error");
   DefSym(UndefinedSymbol,       "undefined-symbol");
@@ -1871,6 +1873,19 @@ static int evalPrimPrint(LeVM* vm, Obj args) {
 }
 
 
+// ===== System =====
+
+static int evalPrimExit(LeVM* vm, Obj args) {
+  // (%prim:exit Code) => exit with code
+  Obj code = Car(args);
+
+  if (!le_is_num(code))
+    return le_raise_with(vm, Sym(InvalidArgs), args);
+
+  exit(le_obj2int(code));
+  return Le_OK; // avoid warning
+}
+
 // ===== Pair =====
 
 static int evalPair(LeVM* vm, Obj xs) {
@@ -1919,6 +1934,7 @@ static int evalPair(LeVM* vm, Obj xs) {
   if (first == Sym(PrimPutc))     return evalPrimPutc(vm, args);
   if (first == Sym(PrimGetc))     return evalPrimGetc(vm, args);
   if (first == Sym(PrimPrint))    return evalPrimPrint(vm, args);
+  if (first == Sym(PrimExit))     return evalPrimExit(vm, args);
 
   // eval f
   Push(args);
