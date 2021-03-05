@@ -161,9 +161,28 @@
          Dict)))
 
 
+;; Symbol
+;; =====================================
+
+(def sym:new
+     (fn (Str) (%prim:sym-new Str)))
+
+(def sym:str
+     (fn (Sym) (%prim:sym-str Sym)))
+
+
 ;; String
 ;; =====================================
-(def str (fn (S) (%prim:str S))) ;;TODO: concat
+
+(def strfy (fn (S) (%prim:str S)))
+
+(def str:cat
+     (fn (Xs) (%prim:str-cat Xs)))
+
+(def str
+     (fn Args
+       (%prim:str-cat
+        (list:map Args (fn (X) (if (string? X) X (strfy X)))))))
 
 (def str=
      (fn (A B) (%prim:str-eq A B)))
@@ -197,8 +216,7 @@
 
 (def print
      (fn (X)
-       (io:print FD-STDOUT
-                 (if (string? X) X (str X)))
+       (io:print FD-STDOUT (str X))
        (newline)
        X))
 
