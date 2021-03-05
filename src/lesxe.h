@@ -79,6 +79,7 @@ LeObj* le_new_str_from(LeVM* vm, char* str);
 char*  le_cstr_of(LeObj* str);
 int    le_str_len(LeObj* s);
 LeObj* le_str_concat(LeVM* vm, LeObj* a, LeObj* b);
+int    le_str_eq(LeObj* a, LeObj* b);
 
 LeObj* le_new_sym_from(LeVM* vm, char* name);
 LeObj* le_new_sym(LeVM* vm, LeObj* name);

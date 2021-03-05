@@ -41,7 +41,7 @@ enum {
       /* types */ SymPrimTypeOf, SymPrimHash,
       /* array */ SymPrimArrayNew, SymPrimArrayGet, SymPrimArraySet, SymPrimArrayLen,
       /* pair */ SymPrimCons, SymPrimCar, SymPrimCdr, SymPrimSetCar, SymPrimSetCdr,
-      /* string */ SymPrimStr,
+      /* string */ SymPrimStr, SymPrimStrEq,
       /* i/o */ SymPrimPutc, SymPrimGetc, SymPrimPrint,
       /* system */ SymPrimExit,
       
@@ -704,6 +704,13 @@ Public Obj le_str_concat(LeVM* vm, Obj a, Obj b) {
   return s;
 }
 
+Public int le_str_eq(Obj a, Obj b) {
+  if (a->hash != nil && b->hash != nil && a->hash != b->hash) return 0;
+  char* sa = le_cstr_of(a);
+  char* sb = le_cstr_of(b);
+  return strcmp(sa, sb) == 0;
+}
+
 
 // ===== Symbol =====
 #define SYM_SIZE OBJ_SIZE(Symbol)
@@ -1025,6 +1032,7 @@ static void setupSymbols(LeVM* vm) {
   DefSym(PrimSetCar,            "%prim:set-car!");
   DefSym(PrimSetCdr,            "%prim:set-cdr!");
   DefSym(PrimStr,               "%prim:str");
+  DefSym(PrimStrEq,             "%prim:str-eq");
   DefSym(PrimPutc,              "%prim:putc");
   DefSym(PrimGetc,              "%prim:getc");
   DefSym(PrimPrint,             "%prim:print");
@@ -1814,6 +1822,16 @@ static int evalPrimStr(LeVM* vm, Obj args) {
   return Le_OK;
 }
 
+static int evalPrimStrEq(LeVM* vm, Obj args) {
+  // (%prim:str-eq A B) => true/nil
+  Obj a = Car(args);
+  Obj b = Second(args);
+  if (!(le_is_string(a) && le_is_string(b)))
+    return le_raise_with(vm, Sym(InvalidArgs), args);
+  vm->result = le_str_eq(a, b) ? Sym(True) : nil;
+  return Le_OK;
+}
+
 
 // ===== I/O =====
 
@@ -1930,7 +1948,8 @@ static int evalPair(LeVM* vm, Obj xs) {
   if (first == Sym(PrimCdr))      return evalPrimCdr(vm, args);
   if (first == Sym(PrimSetCar))   return evalPrimSetCar(vm, args);
   if (first == Sym(PrimSetCdr))   return evalPrimSetCdr(vm, args);
-  if (first == Sym(PrimStr))      return evalPrimStr(vm, args);  
+  if (first == Sym(PrimStr))      return evalPrimStr(vm, args);
+  if (first == Sym(PrimStrEq))    return evalPrimStrEq(vm, args);  
   if (first == Sym(PrimPutc))     return evalPrimPutc(vm, args);
   if (first == Sym(PrimGetc))     return evalPrimGetc(vm, args);
   if (first == Sym(PrimPrint))    return evalPrimPrint(vm, args);

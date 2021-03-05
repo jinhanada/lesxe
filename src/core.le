@@ -7,7 +7,7 @@
 (def mod (fn (A B) (%prim:mod A B)))
 
 (def =   (fn (A B) (%prim:eq A B)))
-(def not (fn (x) (%prim:not x)))
+(def not (fn (X)   (%prim:not X)))
 
 (def >  (fn (A B) (%prim:gt A B)))
 (def >= (fn (A B) (if (= A B) true (> A B))))
@@ -26,7 +26,7 @@
 (def array?   (fn (X) (= (type-of X) 'array)))
 (def symbol?  (fn (X) (= (type-of X) 'symbol)))
 (def pair?    (fn (X) (= (type-of X) 'pair)))
-(def func? (fn (X) (= (type-of X) 'func)))
+(def func?    (fn (X) (= (type-of X) 'func)))
 (def bytes?   (fn (X) (= (type-of X) 'bytes)))
 (def string?  (fn (X) (= (type-of X) 'string)))
 
@@ -165,6 +165,9 @@
 ;; =====================================
 (def str (fn (S) (%prim:str S))) ;;TODO: concat
 
+(def str=
+     (fn (A B) (%prim:str-eq A B)))
+
 
 ;; I/O
 ;; =====================================
@@ -284,7 +287,7 @@
  macro:SYNTAX-DICT
  'apply
  (fn (Counter Expr)
-   (let ((F (macro: aux-rec Counter)))
+   (let ((F (macro:aux-rec Counter)))
      (list 'apply
            (F (car Expr))
            (F (second Expr))))))
@@ -419,3 +422,16 @@
 
 (de (exit Code)
   (%prim:exit (if Code Code 0)))
+
+
+;; Pair 2
+;; =====================================
+
+(de (list:cons* X . Xs)
+  ;; (cons* 1 2 3) => (1 2 . 3)
+  ;; (cons* 1 2 '(3 4)) => (1 2 3 4)
+  (if Xs
+      (if (and (pair? (car Xs)) (not (cdr Xs)))
+          (cons X (car Xs))
+          (cons X (apply list:cons* Xs)))
+      X))
