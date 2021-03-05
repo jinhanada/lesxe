@@ -50,6 +50,7 @@ enum {
       SymExpectInteger, SymZeroDivision,
       SymFileNotFound, SymInvalidPreEvalProc,
       SymInvalidFileDescriptor, SymNotAProc,
+      SymOutOfRange,
 
       SymTableSize
 };
@@ -977,7 +978,7 @@ static void setupSymbols(LeVM* vm) {
   DefSym(Nil,                   "nil");
   DefSym(True,                  "true");
   DefSym(Quote,                 "quote");
-  DefSym(Quasiquote,             "quasiquote");
+  DefSym(Quasiquote,            "quasiquote");
   DefSym(Unquote,               "unquote");
   DefSym(UnquoteSplicing,       "unquote-splicing");
   DefSym(Let,                   "let");
@@ -1031,6 +1032,7 @@ static void setupSymbols(LeVM* vm) {
   DefSym(InvalidPreEvalProc,    "invalid-pre-eval-proc");
   DefSym(InvalidFileDescriptor, "invalid-file-descriptor");
   DefSym(NotAProc,              "not-a-proc");
+  DefSym(OutOfRange,            "out-of-range");
 }
 
 #define SetAsIs(symname) (setGlobal(vm, Sym(symname), Sym(symname)))
@@ -1720,6 +1722,8 @@ static int evalPrimArrayGet(LeVM* vm, Obj args) {
   if (!(le_is_array(xs) && le_is_num(obj_i)))
     return le_raise_with(vm, Sym(InvalidArgs), args);
   int i = le_obj2int(obj_i);
+  if (i < 0 || i >= le_array_len(xs))
+    return le_raise_with(vm, Sym(OutOfRange), args);
   vm->result = xs->Array.data[i];
   return Le_OK;
 }
@@ -1731,6 +1735,8 @@ static int evalPrimArraySet(LeVM* vm, Obj args) {
   if (!(le_is_array(xs) && le_is_num(obj_i)))
     return le_raise_with(vm, Sym(InvalidArgs), args);
   int i = le_obj2int(obj_i);
+  if (i < 0 || i >= le_array_len(xs))
+    return le_raise_with(vm, Sym(OutOfRange), args);  
   xs->Array.data[i] = val;
   vm->result = xs;
   return Le_OK;

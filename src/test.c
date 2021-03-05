@@ -602,6 +602,18 @@ void test_prim_array(LeVM* vm) {
   int code = le_eval_str(vm, src);
   AssertOK;
   assert(le_obj2int(vm->result) == 123 + 42);
+
+  // Deny negative index
+  code = le_eval_str(vm, "(%prim:array-get (%prim:array-new 42) -1)");
+  assert(code == Le_ERR);
+  code = le_eval_str(vm, "(%prim:array-set! (%prim:array-new 42) -1 nil)");
+  assert(code == Le_ERR);
+
+  // Deny out of range
+  code = le_eval_str(vm, "(%prim:array-get (%prim:array-new 42) 42)");
+  assert(code == Le_ERR);
+  code = le_eval_str(vm, "(%prim:array-set! (%prim:array-new 42) 42 nil)");
+  assert(code == Le_ERR);
 }
 
 void test_prim_pair(LeVM* vm) {
