@@ -30,7 +30,7 @@ enum {
       SymQuote, SymQuasiquote,
       SymUnquote, SymUnquoteSplicing,
       SymLet, SymFn, SymDef, SymIf,
-      SymSet, SymWhile, SymApply, SymPreEval,
+      SymSet, SymWhile, SymBreak, SymContinue, SymApply, SymPreEval,
 
       /* types */
       SymNumber, SymArray, SymSymbol, SymPair, SymFunc, SymBytes, SymString,
@@ -1001,6 +1001,8 @@ static void setupSymbols(LeVM* vm) {
   DefSym(If,                    "if");
   DefSym(Set,                   "set!");
   DefSym(While,                 "while");
+  DefSym(Break,                 "break");
+  DefSym(Continue,              "continue");
   DefSym(Apply,                 "apply");
   DefSym(PreEval,               "%pre-eval");
   /* types */
@@ -1581,6 +1583,8 @@ static int evalWhile(LeVM* vm, Obj xs) {
   while (code == Le_OK && vm->result != nil) {
     body = le_stack_at(vm, body_i);
     code = evalExprs(vm, body);
+    if (code == Le_Continue) code = Le_OK;
+    if (code == Le_Break)    break;
     if (code != Le_OK) RestoreReturn(code);
     cond = le_stack_at(vm, cond_i);
     code = eval(vm, cond);
@@ -1919,6 +1923,8 @@ static int evalPair(LeVM* vm, Obj xs) {
   if (first == Sym(If))       return evalIf(vm, rest);
   if (first == Sym(Set))      return evalSet(vm, rest);
   if (first == Sym(While))    return evalWhile(vm, rest);
+  if (first == Sym(Break))    return Le_Break;
+  if (first == Sym(Continue)) return Le_Continue;
   if (first == Sym(Quote))    return evalQuote(vm, rest);
 
   // eval args

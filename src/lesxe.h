@@ -15,7 +15,7 @@
 typedef struct LeObj LeObj;
 typedef struct LeVM  LeVM;
 
-enum { Le_OK, Le_ERR, Le_Continue, Le_EOF };
+enum { Le_OK, Le_ERR, Le_Break, Le_Continue, Le_EOF };
 
 enum {
       Le_nil,   Le_int,

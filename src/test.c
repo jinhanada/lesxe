@@ -550,10 +550,27 @@ void test_eval_set(LeVM* vm) {
 }
 
 void test_eval_while(LeVM* vm) {
-  int code = le_eval_str(vm, "(let ((i 0)) (while (%prim:gt 10 i) (set! i (%prim:add i 1))) i)");
-  Obj x = vm->result;
+  int code;
+  Obj x;
+  char* src;
+
+  src = "(let ((i 0)) (while (%prim:gt 10 i) (set! i (%prim:add i 1))) i)";
+  code = le_eval_str(vm, src);
+  x = vm->result;
   AssertOK;
   assert(le_obj2int(x) == 10);
+
+  src =
+    "(let ((i 0))"
+    "  (while true"
+    "    (set! i (%prim:add i 1))"
+    "    (if (%prim:gt 10 i) (continue))"
+    "    (break)) i)"
+    ;
+  code = le_eval_str(vm, src);
+  x = vm->result;
+  AssertOK;
+  assert(le_obj2int(x) == 10);    
 }
 
 void test_eval_predefined_symbols(LeVM* vm) {

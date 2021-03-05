@@ -252,6 +252,16 @@
 
 (dict:set!
  macro:SYNTAX-DICT
+ 'break
+ (fn (Counter _) (list 'break)))
+
+(dict:set!
+ macro:SYNTAX-DICT
+ 'continue
+ (fn (Counter _) (list 'continue)))
+
+(dict:set!
+ macro:SYNTAX-DICT
  'set!
  (fn (Counter Expr)
    (let ((F   (macro:aux-rec Counter))
@@ -435,3 +445,4 @@
           (cons X (car Xs))
           (cons X (apply list:cons* Xs)))
       X))
+
