@@ -19,7 +19,7 @@ enum { Le_OK, Le_ERR, Le_Continue, Le_EOF };
 
 enum {
       Le_nil,   Le_int,
-      Le_array, Le_symbol, Le_pair, Le_closure, Le_user,
+      Le_array, Le_symbol, Le_pair, Le_func, Le_user,
       Le_bytes, Le_string,
       Le_unknown
 };
@@ -38,7 +38,7 @@ int le_is_obj(LeObj* p);
 int le_is_array(LeObj* p);
 int le_is_symbol(LeObj* p);
 int le_is_pair(LeObj* p);
-int le_is_closure(LeObj* p);
+int le_is_func(LeObj* p);
 int le_is_bytes(LeObj* p);
 int le_is_string(LeObj* p);
 
@@ -83,7 +83,7 @@ LeObj* le_str_concat(LeVM* vm, LeObj* a, LeObj* b);
 LeObj* le_new_sym_from(LeVM* vm, char* name);
 LeObj* le_new_sym(LeVM* vm, LeObj* name);
 
-LeObj* le_new_closure(LeVM* vm, LeObj* code, LeObj* env, LeObj* params);
+LeObj* le_new_func(LeVM* vm, LeObj* code, LeObj* env, LeObj* params);
 
 
 // VM

@@ -55,7 +55,7 @@ void test_object_header() {
   Cell h; // header
   h = setType(h, T_SYMBOL);  assert(!isBytes(h) && typeOf(h) == T_SYMBOL);
   h = setType(h, T_PAIR);    assert(!isBytes(h) && typeOf(h) == T_PAIR);
-  h = setType(h, T_CLOSURE); assert(!isBytes(h) && typeOf(h) == T_CLOSURE);
+  h = setType(h, T_FUNC);    assert(!isBytes(h) && typeOf(h) == T_FUNC);
   h = setType(h, T_USER);    assert(!isBytes(h) && typeOf(h) == T_USER);
   h = setType(h, T_BYTES);   assert(isBytes(h)  && typeOf(h) == T_BYTES);
   h = setType(h, T_STRING);  assert(isBytes(h)  && typeOf(h) == T_STRING);

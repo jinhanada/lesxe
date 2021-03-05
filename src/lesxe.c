@@ -33,7 +33,7 @@ enum {
       SymSet, SymWhile, SymApply, SymPreEval,
 
       /* types */
-      SymNumber, SymArray, SymSymbol, SymPair, SymClosure, SymBytes, SymString,
+      SymNumber, SymArray, SymSymbol, SymPair, SymFunc, SymBytes, SymString,
       
       /* primitives */
       /* arithmetics */ SymPrimAdd, SymPrimSub, SymPrimMul, SymPrimDiv, SymPrimMod,
@@ -78,7 +78,7 @@ typedef struct {
   LeObj* code;
   LeObj* env;
   LeObj* vars;
-} Closure;
+} Func;
 
 typedef struct {
   intptr_t size;
@@ -97,7 +97,7 @@ struct LeObj {
     Array   Array;
     Symbol  Symbol;
     Pair    Pair;
-    Closure Closure;
+    Func Func;
     Bytes   Bytes;
     Root    Root;
   };
@@ -252,7 +252,7 @@ static int writeTextFile(char* fname, char* s) {
 #define T_ARRAY   0x00 // 0000
 #define T_SYMBOL  0x02 // 0010
 #define T_PAIR    0x04 // 0100
-#define T_CLOSURE 0x06 // 0110
+#define T_FUNC    0x06 // 0110
 #define T_USER    0x0E // 1110 user defined
 #define T_BYTES   0x01 // 0001
 #define T_STRING  0x03 // 0011
@@ -335,7 +335,7 @@ Public int le_typeof(Obj p) {
   case T_ARRAY:   return Le_array;
   case T_SYMBOL:  return Le_symbol;
   case T_PAIR:    return Le_pair;
-  case T_CLOSURE: return Le_closure;
+  case T_FUNC:    return Le_func;
   case T_USER:    return Le_user;
   case T_BYTES:   return Le_bytes;
   case T_STRING:  return Le_string;
@@ -355,8 +355,8 @@ Public int le_is_pair(Obj p) {
   return le_typeof(p) == Le_pair;
 }
 
-Public int le_is_closure(Obj p) {
-  return le_typeof(p) == Le_closure;
+Public int le_is_func(Obj p) {
+  return le_typeof(p) == Le_func;
 }
 
 Public int le_is_bytes(Obj p) {
@@ -756,18 +756,18 @@ Public Obj le_new_sym_from(LeVM* vm, char* name) {
 }
 
 
-// ===== Closure =====
+// ===== Func =====
 
-#define CLOSURE_SIZE OBJ_SIZE(Closure)
+#define FUNC_SIZE OBJ_SIZE(Func)
 
-Public Obj le_new_closure(LeVM* vm, Obj code, Obj env, Obj vars) {
+Public Obj le_new_func(LeVM* vm, Obj code, Obj env, Obj vars) {
   Push(code);
   Push(env);
   Push(vars);
-  Obj c = newObj(vm, CLOSURE_SIZE, T_CLOSURE);
-  c->Closure.vars = Pop();  
-  c->Closure.env  = Pop();
-  c->Closure.code = Pop();
+  Obj c = newObj(vm, FUNC_SIZE, T_FUNC);
+  c->Func.vars = Pop();  
+  c->Func.env  = Pop();
+  c->Func.code = Pop();
   return c;
 }
 
@@ -892,8 +892,8 @@ static void toStrSub(Str* s, Obj x) {
     putStr(s, "\"");
     toStrStr(s, x);
     return putStr(s, "\"");
-  case Le_closure:
-    return putStr(s, "#<CLOSURE>");
+  case Le_func:
+    return putStr(s, "#<Func>");
   case Le_array:
     putStr(s, "#<Array ");
     toStrSub(s, le_int2obj(le_array_len(x)));
@@ -1001,7 +1001,7 @@ static void setupSymbols(LeVM* vm) {
   DefSym(Array,                 "array");
   DefSym(Symbol,                "symbol");
   DefSym(Pair,                  "pair");
-  DefSym(Closure,               "closure");
+  DefSym(Func,                  "func");
   DefSym(Bytes,                 "bytes");
   DefSym(String,                "string");  
   /* primitives */
@@ -1053,7 +1053,7 @@ static void setupVariables(LeVM* vm) {
   SetAsIs(Array);
   SetAsIs(Symbol);
   SetAsIs(Pair);
-  SetAsIs(Closure);
+  SetAsIs(Func);
   SetAsIs(Bytes);
   SetAsIs(String);
 }
@@ -1428,7 +1428,7 @@ static int evalFn(LeVM* vm, Obj rest) {
   if (binds != nil && !le_is_pair(binds) && !le_is_symbol(binds))
     return le_raise_with(vm, Sym(MalformedFn), rest);
 
-  Obj f = le_new_closure(vm, body, vm->env, binds);
+  Obj f = le_new_func(vm, body, vm->env, binds);
   vm->result = f;
   return Le_OK;
 }
@@ -1459,17 +1459,17 @@ static int evalArgs(LeVM* vm, Obj args) {
   return Le_OK;
 }
 
-static int applyClosure(LeVM* vm, Obj closure, Obj args) {
-  // closure should be type checked
+static int applyFunc(LeVM* vm, Obj func, Obj args) {
+  // func should be type checked
 
   // swap env
   Push(vm->env);
-  Closure cls = closure->Closure;
-  vm->env = cls.env;
+  Func f = func->Func;
+  vm->env = f.env;
   
   // create env
-  Push(closure);
-  Obj vars = cls.vars;
+  Push(func);
+  Obj vars = f.vars;
   Obj env = nil;
   while (vars != nil) {
     // rest
@@ -1490,10 +1490,10 @@ static int applyClosure(LeVM* vm, Obj closure, Obj args) {
     vars = Cdr(Pop());
   }
   vm->env = le_cons(vm, env, vm->env);
-  closure = Pop();
+  func = Pop();
 
   // apply
-  int code = evalExprs(vm, cls.code);
+  int code = evalExprs(vm, f.code);
   // result or err is set on vm
   
   // restore env
@@ -1592,9 +1592,9 @@ static int evalApply(LeVM* vm, Obj xs) {
   // F and Args should be evaled
   Obj f    = Car(xs);
   Obj args = Second(xs);
-  if (!le_is_closure(f))
+  if (!le_is_func(f))
     return le_raise_with(vm, Sym(NotAProc), f);
-  return applyClosure(vm, f, args);
+  return applyFunc(vm, f, args);
 }
 
 
@@ -1698,7 +1698,7 @@ static int evalPrimTypeOf(LeVM* vm, Obj args) {
   case Le_array:   r = Sym(Array); break;
   case Le_symbol:  r = Sym(Symbol); break;
   case Le_pair:    r = Sym(Pair); break;
-  case Le_closure: r = Sym(Closure); break;
+  case Le_func:    r = Sym(Func); break;
   case Le_bytes:   r = Sym(Bytes); break;
   case Le_string:  r = Sym(String); break;
   }
@@ -1943,7 +1943,7 @@ static int evalPair(LeVM* vm, Obj xs) {
   Obj f = vm->result;
   args = Pop();  
 
-  if (le_is_closure(f)) return applyClosure(vm, f, args);
+  if (le_is_func(f)) return applyFunc(vm, f, args);
 
   return le_raise_with(vm, Sym(NotAProc), f);
 }
@@ -2000,11 +2000,11 @@ int preEval(LeVM* vm, Obj expr) {
     return Le_OK;
   }
 
-  if (!le_is_closure(proc))
+  if (!le_is_func(proc))
     return le_raise_with(vm, Sym(InvalidPreEvalProc), proc);
 
   Obj args = Cons(vm, expr, nil);
-  return applyClosure(vm, proc, args);
+  return applyFunc(vm, proc, args);
 }
 
 

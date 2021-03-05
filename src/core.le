@@ -26,7 +26,7 @@
 (def array?   (fn (X) (= (type-of X) 'array)))
 (def symbol?  (fn (X) (= (type-of X) 'symbol)))
 (def pair?    (fn (X) (= (type-of X) 'pair)))
-(def closure? (fn (X) (= (type-of X) 'closure)))
+(def func? (fn (X) (= (type-of X) 'func)))
 (def bytes?   (fn (X) (= (type-of X) 'bytes)))
 (def string?  (fn (X) (= (type-of X) 'string)))
 
