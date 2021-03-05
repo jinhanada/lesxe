@@ -911,7 +911,13 @@ static char* toStr(Obj x) {
   // note: you should free returned string
   Str s;
   initStr(&s);
-  toStrSub(&s, x);
+
+  if (x == nil) {
+    putStr(&s, "nil"); // toplevel nil
+  } else {
+    toStrSub(&s, x);
+  }
+
   return extractStr(&s);
 }
 
