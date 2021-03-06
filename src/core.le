@@ -252,6 +252,14 @@
        (newline)
        X))
 
+(def file:read-text
+     (fn (FName)
+       (%prim:read-text-file FName)))
+
+(def file:write-text
+     (fn (FName Str)
+       (%prim:write-text-file FName Str)))
+
 
 ;; Macro System
 ;; =====================================
@@ -416,14 +424,6 @@
 ;; Macros
 ;; =====================================
 
-(demac (de Def . Body)
-  (let ((Name (car Def))
-        (Args (cdr Def)))
-    (list 'def
-          Name
-          (cons 'fn (cons Args Body)))))
-
-
 (demac (and . Xs)
   (let ((rec nil))
     (set! rec
@@ -487,6 +487,12 @@
     `(let ,Defs ,@Sets ,@Body)))
 
 
+(demac (de Def . Body)
+  (let ((Name  (car Def))
+        (Args  (cdr Def)))
+    `(def ,Name ,(cons 'fn (cons Args Body)))))
+
+
 ;; Gensym
 ;; =====================================
 (def sym:GENSYM-COUNTER
@@ -505,6 +511,9 @@
 
 (de (sys:gc)
   (%prim:gc))
+
+(de (sys:load FName)
+  (%prim:load-file FName))
 
 
 ;; Array 2

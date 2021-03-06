@@ -49,10 +49,12 @@ enum {
       SymPrimStrMake,
       /* bytes */
       SymPrimBytesNew, SymPrimBytesGet, SymPrimBytesSet, SymPrimBytesLen,
-      /* i/o */ SymPrimPutc, SymPrimGetc, SymPrimPrint,
+      /* i/o */
+      SymPrimPutc, SymPrimGetc, SymPrimPrint,
+      SymPrimReadTextFile, SymPrimWriteTextFile,
       /* read */ SymPrimReadStr,
       /* error */ SymPrimRaise,
-      /* system */ SymPrimExit, SymPrimGC,
+      /* system */ SymPrimExit, SymPrimGC, SymPrimLoadFile,
       
       /* errors */
       SymError, SymUndefinedSymbol,
@@ -60,7 +62,7 @@ enum {
       SymExpectInteger, SymZeroDivision,
       SymFileNotFound, SymInvalidPreEvalProc,
       SymInvalidFileDescriptor, SymNotAProc,
-      SymOutOfRange,
+      SymOutOfRange, SymUnknownError,
 
       SymTableSize
 };
@@ -1093,9 +1095,12 @@ static void setupSymbols(LeVM* vm) {
   DefSym(PrimPutc,              "%prim:putc");
   DefSym(PrimGetc,              "%prim:getc");
   DefSym(PrimPrint,             "%prim:print");
+  DefSym(PrimReadTextFile,      "%prim:read-text-file");
+  DefSym(PrimWriteTextFile,     "%prim:write-text-file");
   /* System */
   DefSym(PrimExit,              "%prim:exit");
   DefSym(PrimGC,                "%prim:gc");
+  DefSym(PrimLoadFile,          "%prim:load-file");
   /* errors */
   DefSym(Error,                 "error");
   DefSym(UndefinedSymbol,       "undefined-symbol");
@@ -1108,6 +1113,7 @@ static void setupSymbols(LeVM* vm) {
   DefSym(InvalidFileDescriptor, "invalid-file-descriptor");
   DefSym(NotAProc,              "not-a-proc");
   DefSym(OutOfRange,            "out-of-range");
+  DefSym(UnknownError,          "unknown-error");
 }
 
 #define SetAsIs(symname) (setGlobal(vm, Sym(symname), Sym(symname)))
@@ -2139,6 +2145,30 @@ static int evalPrimPrint(LeVM* vm, Obj args) {
   return Le_OK;
 }
 
+static int evalPrimReadTextFile(LeVM* vm, Obj args) {
+  // (%prim:read-text-file FileName) => String
+  Obj fname = Car(args);
+  ExpectType(string, fname);
+  char* text = readTextFile(le_cstr_of(fname));
+  if (text == NULL)
+    return le_raise_with(vm, Sym(FileNotFound), fname);
+  vm->result = le_new_str_from(vm, text);
+  free(text);
+  return Le_OK;
+}
+
+static int evalPrimWriteTextFile(LeVM* vm, Obj args) {
+  // (%prim:write-text-file FileName String) => String
+  Obj fname = Car(args);
+  Obj text = Second(args);
+  ExpectType(string, text);
+  ExpectType(string, fname);
+  if (!writeTextFile(le_cstr_of(fname), le_cstr_of(text)))
+    return RaiseWith(UnknownError, args);
+  vm->result = text;
+  return Le_OK;
+}
+
 
 // ===== Error =====
 
@@ -2170,6 +2200,13 @@ static int evalPrimGC(LeVM* vm, Obj args) {
   return Le_OK;
 }
 
+static int evalPrimLoadFile(LeVM* vm, Obj args) {
+  Obj fname = Car(args);
+  ExpectType(string, fname);
+  return le_load_file(vm, le_cstr_of(fname));
+}
+
+
 // ===== Pair =====
 
 static int evalPair(LeVM* vm, Obj xs) {
@@ -2197,57 +2234,60 @@ static int evalPair(LeVM* vm, Obj xs) {
   Obj args = vm->result;
   first = Pop();
 
-  if (first == Sym(Apply))        return evalApply(vm, args);
+  if (first == Sym(Apply))             return evalApply(vm, args);
   // Arithmetics
-  if (first == Sym(PrimAdd))      return evalPrimAdd(vm,  args);
-  if (first == Sym(PrimSub))      return evalPrimSub(vm,  args);
-  if (first == Sym(PrimMul))      return evalPrimMul(vm,  args);
-  if (first == Sym(PrimDiv))      return evalPrimDiv(vm,  args);
-  if (first == Sym(PrimMod))      return evalPrimMod(vm,  args);
+  if (first == Sym(PrimAdd))           return evalPrimAdd(vm,  args);
+  if (first == Sym(PrimSub))           return evalPrimSub(vm,  args);
+  if (first == Sym(PrimMul))           return evalPrimMul(vm,  args);
+  if (first == Sym(PrimDiv))           return evalPrimDiv(vm,  args);
+  if (first == Sym(PrimMod))           return evalPrimMod(vm,  args);
   // Compare
-  if (first == Sym(PrimEq))       return evalPrimEq(vm,   args);
-  if (first == Sym(PrimNot))      return evalPrimNot(vm,  args);
-  if (first == Sym(PrimGt))       return evalPrimGt(vm,   args);
+  if (first == Sym(PrimEq))            return evalPrimEq(vm,   args);
+  if (first == Sym(PrimNot))           return evalPrimNot(vm,  args);
+  if (first == Sym(PrimGt))            return evalPrimGt(vm,   args);
   // Types
-  if (first == Sym(PrimTypeOf))   return evalPrimTypeOf(vm, args);
-  if (first == Sym(PrimHash))     return evalPrimHash(vm, args);
+  if (first == Sym(PrimTypeOf))        return evalPrimTypeOf(vm, args);
+  if (first == Sym(PrimHash))          return evalPrimHash(vm, args);
   // Array
-  if (first == Sym(PrimArrayNew)) return evalPrimArrayNew(vm, args);
-  if (first == Sym(PrimArrayGet)) return evalPrimArrayGet(vm, args);
-  if (first == Sym(PrimArraySet)) return evalPrimArraySet(vm, args);
-  if (first == Sym(PrimArrayLen)) return evalPrimArrayLen(vm, args);
+  if (first == Sym(PrimArrayNew))      return evalPrimArrayNew(vm, args);
+  if (first == Sym(PrimArrayGet))      return evalPrimArrayGet(vm, args);
+  if (first == Sym(PrimArraySet))      return evalPrimArraySet(vm, args);
+  if (first == Sym(PrimArrayLen))      return evalPrimArrayLen(vm, args);
   // Pair
-  if (first == Sym(PrimCons))     return evalPrimCons(vm, args);
-  if (first == Sym(PrimCar))      return evalPrimCar(vm, args);
-  if (first == Sym(PrimCdr))      return evalPrimCdr(vm, args);
-  if (first == Sym(PrimSetCar))   return evalPrimSetCar(vm, args);
-  if (first == Sym(PrimSetCdr))   return evalPrimSetCdr(vm, args);
+  if (first == Sym(PrimCons))          return evalPrimCons(vm, args);
+  if (first == Sym(PrimCar))           return evalPrimCar(vm, args);
+  if (first == Sym(PrimCdr))           return evalPrimCdr(vm, args);
+  if (first == Sym(PrimSetCar))        return evalPrimSetCar(vm, args);
+  if (first == Sym(PrimSetCdr))        return evalPrimSetCdr(vm, args);
   // Symbol
-  if (first == Sym(PrimSymNew))   return evalPrimSymNew(vm, args);
-  if (first == Sym(PrimSymStr))   return evalPrimSymStr(vm, args);
+  if (first == Sym(PrimSymNew))        return evalPrimSymNew(vm, args);
+  if (first == Sym(PrimSymStr))        return evalPrimSymStr(vm, args);
   // String
-  if (first == Sym(PrimStr))      return evalPrimStr(vm, args);
-  if (first == Sym(PrimStrLen))   return evalPrimStrLen(vm, args);
-  if (first == Sym(PrimStrGet))   return evalPrimStrGet(vm, args);
-  if (first == Sym(PrimStrEq))    return evalPrimStrEq(vm, args);
-  if (first == Sym(PrimStrCat))   return evalPrimStrCat(vm, args);
-  if (first == Sym(PrimStrMake))  return evalPrimStrMake(vm, args);
+  if (first == Sym(PrimStr))           return evalPrimStr(vm, args);
+  if (first == Sym(PrimStrLen))        return evalPrimStrLen(vm, args);
+  if (first == Sym(PrimStrGet))        return evalPrimStrGet(vm, args);
+  if (first == Sym(PrimStrEq))         return evalPrimStrEq(vm, args);
+  if (first == Sym(PrimStrCat))        return evalPrimStrCat(vm, args);
+  if (first == Sym(PrimStrMake))       return evalPrimStrMake(vm, args);
   // Bytes
-  if (first == Sym(PrimBytesNew)) return evalPrimBytesNew(vm, args);
-  if (first == Sym(PrimBytesGet)) return evalPrimBytesGet(vm, args);
-  if (first == Sym(PrimBytesSet)) return evalPrimBytesSet(vm, args);
-  if (first == Sym(PrimBytesLen)) return evalPrimBytesLen(vm, args);
+  if (first == Sym(PrimBytesNew))      return evalPrimBytesNew(vm, args);
+  if (first == Sym(PrimBytesGet))      return evalPrimBytesGet(vm, args);
+  if (first == Sym(PrimBytesSet))      return evalPrimBytesSet(vm, args);
+  if (first == Sym(PrimBytesLen))      return evalPrimBytesLen(vm, args);
   // Error
-  if (first == Sym(PrimRaise))    return evalPrimRaise(vm, args);
+  if (first == Sym(PrimRaise))         return evalPrimRaise(vm, args);
   // Read
-  if (first == Sym(PrimReadStr))  return evalPrimReadStr(vm, args);
+  if (first == Sym(PrimReadStr))       return evalPrimReadStr(vm, args);
   // I/O
-  if (first == Sym(PrimPutc))     return evalPrimPutc(vm, args);
-  if (first == Sym(PrimGetc))     return evalPrimGetc(vm, args);
-  if (first == Sym(PrimPrint))    return evalPrimPrint(vm, args);
+  if (first == Sym(PrimPutc))          return evalPrimPutc(vm, args);
+  if (first == Sym(PrimGetc))          return evalPrimGetc(vm, args);
+  if (first == Sym(PrimPrint))         return evalPrimPrint(vm, args);
+  if (first == Sym(PrimReadTextFile))  return evalPrimReadTextFile(vm, args);
+  if (first == Sym(PrimWriteTextFile)) return evalPrimWriteTextFile(vm, args);
   // System
-  if (first == Sym(PrimExit))     return evalPrimExit(vm, args);
-  if (first == Sym(PrimGC))       return evalPrimGC(vm, args);
+  if (first == Sym(PrimExit))          return evalPrimExit(vm, args);
+  if (first == Sym(PrimGC))            return evalPrimGC(vm, args);
+  if (first == Sym(PrimLoadFile))      return evalPrimLoadFile(vm, args);
 
   // eval f
   Push(args);
