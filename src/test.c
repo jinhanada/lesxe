@@ -725,6 +725,10 @@ void test_prim_raise(LeVM* vm) {
   code = le_eval_str(vm, "(%prim:raise 123)");
   assert(code == Le_ERR);
   assert(vm->err = le_int2obj(123));
+
+  code = le_eval_str(vm, "(catch (%prim:raise 123) (fn (E) E))");
+  AssertOK;
+  assert(vm->result = le_int2obj(123));  
 }
 
 

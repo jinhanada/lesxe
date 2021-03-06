@@ -343,6 +343,15 @@
            (F (car Expr))
            (F (second Expr))))))
 
+(dict:set!
+ macro:SYNTAX-DICT
+ 'catch
+ (fn (Counter Expr)
+   (let ((F (macro:aux-rec Counter)))
+     (list 'catch
+           (F (car Expr))
+           (F (second Expr))))))
+
 
 ;; ===== demac =====
 

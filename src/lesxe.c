@@ -29,8 +29,9 @@ enum {
       SymTrue,
       SymQuote, SymQuasiquote,
       SymUnquote, SymUnquoteSplicing,
-      SymLet, SymFn, SymDef, SymIf,
-      SymSet, SymWhile, SymBreak, SymContinue, SymApply, SymPreEval,
+      SymLet, SymFn, SymDef, SymIf, SymSet,
+      SymWhile, SymBreak, SymContinue,
+      SymApply, SymCatch, SymPreEval,
 
       /* types */
       SymNumber, SymArray, SymSymbol, SymPair, SymFunc, SymBytes, SymString,
@@ -1030,6 +1031,7 @@ static void setupSymbols(LeVM* vm) {
   DefSym(Break,                 "break");
   DefSym(Continue,              "continue");
   DefSym(Apply,                 "apply");
+  DefSym(Catch,                 "catch");
   DefSym(PreEval,               "%pre-eval");
   /* types */
   DefSym(Number,                "number");
@@ -1641,6 +1643,34 @@ static int evalWhile(LeVM* vm, Obj xs) {
   RestoreReturn(Le_OK);
 }
 
+static int evalCatch(LeVM* vm, Obj xs) {
+  // (catch expr fn)
+  SaveStack;
+  Obj expr = Car(xs);
+  Obj f = Second(xs);
+  Push(f);
+
+  int code = eval(vm, expr);
+  if (code != Le_ERR) RestoreReturn(code);
+
+  // raised
+  f = Pop();
+  Push(vm->err);
+  code = eval(vm, f);
+  if (code != Le_OK) RestoreReturn(code);
+  
+  f = vm->result;
+  if (!le_is_func(vm->result))
+    RestoreReturn(le_raise_with(vm, Sym(InvalidArgs), f));
+
+  Obj err = Pop();
+  Push(f);
+  Obj args = Cons(vm, err, nil);
+  f = Pop();
+
+  return applyFunc(vm, f, args);
+}
+
 static int evalQuote(LeVM* vm, Obj xs) {
   vm->result = xs;
   return Le_OK;
@@ -2132,6 +2162,7 @@ static int evalPair(LeVM* vm, Obj xs) {
   if (first == Sym(While))    return evalWhile(vm, rest);
   if (first == Sym(Break))    return Le_Break;
   if (first == Sym(Continue)) return Le_Continue;
+  if (first == Sym(Catch))    return evalCatch(vm, rest);
   if (first == Sym(Quote))    return evalQuote(vm, rest);
 
   // eval args
