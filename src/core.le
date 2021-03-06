@@ -206,14 +206,22 @@
 
 ;; Bytes
 ;; =====================================
+
 (def bytes:new  (fn (N)      (%prim:bytes-new N)))
 (def bytes:get  (fn (Xs I)   (%prim:bytes-get Xs I)))
 (def bytes:set! (fn (Xs I V) (%prim:bytes-set! Xs I V)))
 (def bytes:len  (fn (Xs)     (%prim:bytes-len Xs)))
 
 
+;; Read
+;; =====================================
+
+(def read:str (fn (S) (%prim:read-str S)))
+
+
 ;; I/O
 ;; =====================================
+
 (def FD-STDIN  0)
 (def FD-STDOUT 1)
 (def FD-STDERR 2)

@@ -50,6 +50,7 @@ enum {
       /* bytes */
       SymPrimBytesNew, SymPrimBytesGet, SymPrimBytesSet, SymPrimBytesLen,
       /* i/o */ SymPrimPutc, SymPrimGetc, SymPrimPrint,
+      /* read */ SymPrimReadStr,
       /* error */ SymPrimRaise,
       /* system */ SymPrimExit, SymPrimGC,
       
@@ -164,6 +165,7 @@ typedef uint8_t  Byte;
 #define OBJ_SIZE(structure)    (sizeof(structure)/sizeof(Cell))
 #define ExpectOK               if (code != Le_OK) return code;
 #define RaiseWith(e, xs)       (le_raise_with(vm, Sym(e), xs))
+#define ExpectType(t, v)       if (!le_is_##t(v)) return RaiseWith(InvalidArgs, v)
 
 
 // Forward declarations
@@ -1085,6 +1087,8 @@ static void setupSymbols(LeVM* vm) {
   DefSym(PrimBytesLen,          "%prim:bytes-len");
   /* Error */
   DefSym(PrimRaise,             "%prim:raise");
+  /* Read */
+  DefSym(PrimReadStr,           "%prim:read-str");
   /* I/O */
   DefSym(PrimPutc,              "%prim:putc");
   DefSym(PrimGetc,              "%prim:getc");
@@ -2069,6 +2073,15 @@ static int evalPrimBytesLen(LeVM* vm, Obj args) {
 }
 
 
+// ===== Read =====
+
+static int evalPrimReadStr(LeVM* vm, Obj args) {
+  Obj s = Car(args);
+  ExpectType(string, s);
+  return le_read_str(vm, le_cstr_of(s)); // result holds expression
+}
+
+
 // ===== I/O =====
 
 static int evalPrimPutc(LeVM* vm, Obj args) {
@@ -2226,6 +2239,8 @@ static int evalPair(LeVM* vm, Obj xs) {
   if (first == Sym(PrimBytesLen)) return evalPrimBytesLen(vm, args);
   // Error
   if (first == Sym(PrimRaise))    return evalPrimRaise(vm, args);
+  // Read
+  if (first == Sym(PrimReadStr))  return evalPrimReadStr(vm, args);
   // I/O
   if (first == Sym(PrimPutc))     return evalPrimPutc(vm, args);
   if (first == Sym(PrimGetc))     return evalPrimGetc(vm, args);
