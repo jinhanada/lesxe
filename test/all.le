@@ -1,0 +1,27 @@
+(demac (test Name . Body)
+  `(catch
+    (let ()
+      (prin1 (str 'test " " ',Name " ... "))
+      ,@Body
+      (print 'ok))
+    (fn (E) (print (list 'test 'failed ',Name E)))))
+
+(de (assert Cond)
+  (or Cond (raise 'assertion-failed)))
+
+(test letrec
+  ;; single recursion
+  (assert
+   (= 11
+      (letrec ((F (fn (X)
+                    (if (> X 10)
+                      X
+                      (F (+ X 1))))))
+        (F 0))))
+  
+  ;; mutual recursion
+  (assert
+   (= 11
+      (letrec ((F (fn (X) (if (> X 10) X (G (+ X 1)))))
+               (G (fn (X) (if (> X 10) X (F (+ X 1))))))
+       (F 0)))))

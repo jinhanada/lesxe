@@ -30,6 +30,7 @@ $(BIN)/text2c: $(SRC)/text2c.c
 .PHONY: test
 test: all $(OUT)/test_lesxe
 	./out/test_lesxe
+	$(BIN)/lesxe test/all.le
 
 
 .PHONY: clean

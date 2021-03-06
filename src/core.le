@@ -246,9 +246,14 @@
 (def io:print
      (fn (FD S) (%prim:print FD S)))
 
-(def print
+(def prin1
      (fn (X)
        (io:print FD-STDOUT (str X))
+       X))
+
+(def print
+     (fn (X)
+       (prin1 X)
        (newline)
        X))
 
