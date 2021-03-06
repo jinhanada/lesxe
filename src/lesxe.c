@@ -940,8 +940,9 @@ static void toStrSub(Str* s, Obj x) {
     return putStr(s, ">");
   }
 
-  if (t == Le_unknown)
+  if (t == Le_unknown) {
     DIE("toStr:unknown %p isObj %d ('%s')", x, le_is_obj(x), extractStr(s));
+  }
 
   char buf[1024];
   snprintf(buf, 1024, "#<Unimplemented toStr for %d>", t);

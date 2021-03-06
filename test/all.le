@@ -7,7 +7,10 @@
     (fn (E) (print (list 'test 'failed ',Name E)))))
 
 (de (assert Cond)
-  (or Cond (raise 'assertion-failed)))
+  (or Cond (raise 'assert)))
+
+(de (assert= A B)
+  (or (= A B) (raise 'assert=)))
 
 (test letrec
   ;; single recursion
@@ -25,3 +28,25 @@
       (letrec ((F (fn (X) (if (> X 10) X (G (+ X 1)))))
                (G (fn (X) (if (> X 10) X (F (+ X 1))))))
        (F 0)))))
+
+(test record-case
+  (assert=
+   'a
+   (record-case '(foo a b)
+     ((foo A B) A)
+     (else      'b)))
+
+  (assert=
+   'b
+   (record-case '(bar a b)
+     ((foo A B) A)
+     (else      'b)))
+
+  (assert=
+   'x
+   (catch
+    (record-case '(bar a b)
+      ((foo A B) A))
+    (fn (_) 'x))))
+
+

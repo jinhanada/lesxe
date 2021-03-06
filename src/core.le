@@ -65,6 +65,19 @@
 (def third  (fn (Xs) (car (cdr (cdr Xs)))))
 
 
+(def list:each
+     (fn (Xs F)
+       (while Xs
+         (F (car Xs))
+         (set! Xs (cdr Xs)))
+       Xs))
+
+(def list:len
+     (fn (Xs)
+       (let ((Len 0))
+         (list:each Xs (fn (_) (set! Len (+ Len 1))))
+         Len)))
+
 (def list:map
      (fn (Xs F)
        (if Xs
@@ -606,3 +619,34 @@
       (array:set! Xs I (str:get S I))
       (set! I (+ I 1)))
     Xs))
+
+
+;; record-case
+;; =====================================
+;; (record-case (list 'foo 1 2)
+;;   ((foo A B) (+ A B))
+;;   (else ...))
+
+(demac (record-case Record . Clauses)
+  (let ((Xs   (sym:gen))
+        (Sign (sym:gen))
+        (Vals (sym:gen)))
+    (letrec ((Expand
+              (fn (Cs)
+                (if Cs
+                  (let ((Clause (car Cs))
+                        (Rest   (Expand (cdr Cs)))
+                        (Match  (car Clause))
+                        (Body   (cdr Clause)))
+                    (if (= Match 'else)
+                      `(let () ,@Body)
+                      (let ((Op     (car Match))
+                            (Binds  (cdr Match)))
+                        `(if (= ,Sign ',Op)
+                           (apply (fn ,Binds ,@Body) ,Vals)
+                           ,Rest))))
+                  `(raise (list 'record-unmatched ,Xs))))))
+      `(let ((,Xs   ,Record)
+             (,Sign (car ,Xs))
+             (,Vals (cdr ,Xs)))
+         ,(Expand Clauses)))))
