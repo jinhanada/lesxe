@@ -45,6 +45,8 @@ enum {
       /* string */
       SymPrimStr, SymPrimStrLen, SymPrimStrGet, SymPrimStrEq, SymPrimStrCat,
       SymPrimStrMake,
+      /* bytes */
+      SymPrimBytesNew, SymPrimBytesGet, SymPrimBytesSet, SymPrimBytesLen,
       /* i/o */ SymPrimPutc, SymPrimGetc, SymPrimPrint,
       /* system */ SymPrimExit,
       
@@ -720,6 +722,17 @@ Public int le_str_eq(Obj a, Obj b) {
 }
 
 
+// ===== Bytes =====
+
+Public Obj le_new_bytes(LeVM* vm, int len) {
+  return newBytesObj(vm, len, T_BYTES);
+}
+
+Public int le_bytes_len(Obj xs) {
+  return xs->Bytes.size;
+}
+
+
 // ===== Symbol =====
 #define SYM_SIZE OBJ_SIZE(Symbol)
 
@@ -913,6 +926,10 @@ static void toStrSub(Str* s, Obj x) {
     putStr(s, "#<Array ");
     toStrSub(s, le_int2obj(le_array_len(x)));
     return putStr(s, ">");
+  case Le_bytes:
+    putStr(s, "#<Bytes ");
+    toStrSub(s, le_int2obj(le_bytes_len(x)));
+    return putStr(s, ">");    
   }
 
   if (t == Le_unknown)
@@ -1056,6 +1073,11 @@ static void setupSymbols(LeVM* vm) {
   DefSym(PrimStrEq,             "%prim:str-eq");
   DefSym(PrimStrCat,            "%prim:str-cat");
   DefSym(PrimStrMake,           "%prim:str-make");
+  /* Bytes */
+  DefSym(PrimBytesNew,          "%prim:bytes-new");
+  DefSym(PrimBytesGet,          "%prim:bytes-get");
+  DefSym(PrimBytesSet,          "%prim:bytes-set!");
+  DefSym(PrimBytesLen,          "%prim:bytes-len");
   /* I/O */
   DefSym(PrimPutc,              "%prim:putc");
   DefSym(PrimGetc,              "%prim:getc");
@@ -1961,6 +1983,55 @@ static int evalPrimStrMake(LeVM* vm, Obj args) {
 }
 
 
+// ===== Bytes =====
+
+static int evalPrimBytesNew(LeVM* vm, Obj args) {
+  Obj x = Car(args);
+  if (!le_is_num(x))
+    return le_raise_with(vm, Sym(ExpectInteger), args);
+  int len = le_obj2int(x);
+  vm->result = le_new_bytes(vm, len);
+  return Le_OK;
+}
+
+static int evalPrimBytesGet(LeVM* vm, Obj args) {
+  Obj xs = Car(args);
+  Obj obj_i  = Second(args);
+  if (!(le_is_bytes(xs) && le_is_num(obj_i)))
+    return le_raise_with(vm, Sym(InvalidArgs), args);
+  int i = le_obj2int(obj_i);
+  if (i < 0 || i >= le_bytes_len(xs))
+    return le_raise_with(vm, Sym(OutOfRange), args);
+  
+  vm->result = le_int2obj(xs->Bytes.data[i]);
+  return Le_OK;
+}
+
+static int evalPrimBytesSet(LeVM* vm, Obj args) {
+  Obj xs = Car(args);
+  Obj obj_i  = Second(args);
+  Obj val = Third(args);
+  if (!(le_is_bytes(xs) && le_is_num(obj_i) && le_is_num(val)))
+    return le_raise_with(vm, Sym(InvalidArgs), args);
+  int i = le_obj2int(obj_i);
+
+  if (i < 0 || i >= le_bytes_len(xs))
+    return le_raise_with(vm, Sym(OutOfRange), args);
+
+  xs->Bytes.data[i] = (Byte)(le_obj2int(val));
+  vm->result = xs;
+  return Le_OK;
+}
+
+static int evalPrimBytesLen(LeVM* vm, Obj args) {
+  Obj xs = Car(args);
+  if (!le_is_bytes(xs))
+    return le_raise_with(vm, Sym(InvalidArgs), args);
+  vm->result = le_int2obj(le_bytes_len(xs));
+  return Le_OK;
+}
+
+
 // ===== I/O =====
 
 static int evalPrimPutc(LeVM* vm, Obj args) {
@@ -2093,6 +2164,11 @@ static int evalPair(LeVM* vm, Obj xs) {
   if (first == Sym(PrimStrEq))    return evalPrimStrEq(vm, args);
   if (first == Sym(PrimStrCat))   return evalPrimStrCat(vm, args);
   if (first == Sym(PrimStrMake))  return evalPrimStrMake(vm, args);
+  // Bytes
+  if (first == Sym(PrimBytesNew)) return evalPrimBytesNew(vm, args);
+  if (first == Sym(PrimBytesGet)) return evalPrimBytesGet(vm, args);
+  if (first == Sym(PrimBytesSet)) return evalPrimBytesSet(vm, args);
+  if (first == Sym(PrimBytesLen)) return evalPrimBytesLen(vm, args);  
   // I/O
   if (first == Sym(PrimPutc))     return evalPrimPutc(vm, args);
   if (first == Sym(PrimGetc))     return evalPrimGetc(vm, args);

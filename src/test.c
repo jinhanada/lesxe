@@ -692,6 +692,33 @@ void test_prim_str(LeVM* vm) {
   assert(code == Le_ERR);
 }
 
+void test_prim_bytes(LeVM* vm) {
+  char* src;
+  int code;
+
+  src =
+    "(let ((Xs (%prim:bytes-new 42)))"
+    "  (%prim:bytes-set! Xs 40 123)"
+    "  (%prim:add (%prim:bytes-get Xs 40) (%prim:bytes-len Xs)))"
+    ;
+  code = le_eval_str(vm, src);
+  AssertOK;
+  assert(vm->result == le_int2obj(123 + 42));
+
+  // bound check
+  code = le_eval_str(vm, "(%prim:bytes-set! (%prim:bytes-new 10) -1 42)");
+  assert(code == Le_ERR);
+
+  code = le_eval_str(vm, "(%prim:bytes-set! (%prim:bytes-new 10) 10 42)");
+  assert(code == Le_ERR);
+
+  code = le_eval_str(vm, "(%prim:bytes-get (%prim:bytes-new 10) -1)");
+  assert(code == Le_ERR);
+
+  code = le_eval_str(vm, "(%prim:bytes-get (%prim:bytes-new 10) 10)");
+  assert(code == Le_ERR);
+}
+
 #define test(Name) { printf("%-30s ", #Name); test_##Name(); printf("ok\n"); }
 #define testVM(Name) {                          \
     printf("%-30s ", #Name);                    \
@@ -733,6 +760,7 @@ void test_all() {
   testVM(prim_array);
   testVM(prim_pair);
   testVM(prim_str);
+  testVM(prim_bytes);
 }
 
 

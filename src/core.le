@@ -196,6 +196,14 @@
      (fn (A B) (%prim:str-eq A B)))
 
 
+;; Bytes
+;; =====================================
+(def bytes:new  (fn (N)      (%prim:bytes-new N)))
+(def bytes:get  (fn (Xs I)   (%prim:bytes-get Xs I)))
+(def bytes:set! (fn (Xs I V) (%prim:bytes-set! Xs I V)))
+(def bytes:len  (fn (Xs)     (%prim:bytes-len Xs)))
+
+
 ;; I/O
 ;; =====================================
 (def FD-STDIN  0)
@@ -492,6 +500,31 @@
 (de (array:list Xs)
   (let ((Acc nil))
     (array:each-back Xs (fn (X) (set! Acc (cons X Acc))))
+    Acc))
+
+
+;; Bytes 2
+;; =====================================
+
+(de (bytes:each Xs F)
+  (let ((I   0)
+        (Len (bytes:len Xs)))
+    (while (> Len I)
+      (F (bytes:get Xs I) I)
+      (set! I (+ I 1)))
+    Xs))
+
+(de (bytes:each-back Xs F)
+  (let ((Len (bytes:len Xs))
+        (I   (- Len 1)))
+    (while (> I -1)
+      (F (bytes:get Xs I) I)
+      (set! I (- I 1)))
+    Xs))
+
+(de (bytes:list Xs)
+  (let ((Acc nil))
+    (bytes:each-back Xs (fn (X) (set! Acc (cons X Acc))))
     Acc))
 
 
