@@ -180,6 +180,10 @@
 
 (def str:len (fn (S) (%prim:str-len S)))
 
+(def str:make
+     ;; ArrayOfChars -> String
+     (fn (Xs) (%prim:str-make Xs)))
+
 (def str:cat
      (fn (Xs) (%prim:str-cat Xs)))
 
@@ -466,6 +470,31 @@
   (%prim:exit (if Code Code 0)))
 
 
+;; Array 2
+;; =====================================
+
+(de (array:each Xs F)
+  (let ((I   0)
+        (Len (array:len Xs)))
+    (while (> Len I)
+      (F (array:get Xs I) I)
+      (set! I (+ I 1)))
+    Xs))
+
+(de (array:each-back Xs F)
+  (let ((Len (array:len Xs))
+        (I   (- Len 1)))
+    (while (> I -1)
+      (F (array:get Xs I) I)
+      (set! I (- I 1)))
+    Xs))
+
+(de (array:list Xs)
+  (let ((Acc nil))
+    (array:each-back Xs (fn (X) (set! Acc (cons X Acc))))
+    Acc))
+
+
 ;; Pair 2
 ;; =====================================
 
@@ -496,8 +525,8 @@
 (de (str:chars S)
   (let ((I   0)
         (Len (str:len S))
-        (Xs  nil))
+        (Xs  (array:new Len)))
     (while (> Len I)
-      (set! Xs (cons (str:get S I) Xs))
+      (array:set! Xs I (str:get S I))
       (set! I (+ I 1)))
-    (list:reverse! Xs)))
+    Xs))

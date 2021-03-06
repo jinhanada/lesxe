@@ -42,7 +42,9 @@ enum {
       /* array */ SymPrimArrayNew, SymPrimArrayGet, SymPrimArraySet, SymPrimArrayLen,
       /* pair */ SymPrimCons, SymPrimCar, SymPrimCdr, SymPrimSetCar, SymPrimSetCdr,
       /* symbol */ SymPrimSymNew, SymPrimSymStr,
-      /* string */ SymPrimStr, SymPrimStrLen, SymPrimStrGet, SymPrimStrEq, SymPrimStrCat,
+      /* string */
+      SymPrimStr, SymPrimStrLen, SymPrimStrGet, SymPrimStrEq, SymPrimStrCat,
+      SymPrimStrMake,
       /* i/o */ SymPrimPutc, SymPrimGetc, SymPrimPrint,
       /* system */ SymPrimExit,
       
@@ -1053,6 +1055,7 @@ static void setupSymbols(LeVM* vm) {
   DefSym(PrimStrGet,            "%prim:str-get");
   DefSym(PrimStrEq,             "%prim:str-eq");
   DefSym(PrimStrCat,            "%prim:str-cat");
+  DefSym(PrimStrMake,           "%prim:str-make");
   /* I/O */
   DefSym(PrimPutc,              "%prim:putc");
   DefSym(PrimGetc,              "%prim:getc");
@@ -1937,6 +1940,26 @@ static int evalPrimStrGet(LeVM* vm, Obj args) {
   return Le_OK;
 }
 
+static int evalPrimStrMake(LeVM* vm, Obj args) {
+  // (%prim:str-make ArrayOfChars) => String
+  Obj xs = Car(args);
+  if (!le_is_array(xs))
+    return le_raise_with(vm, Sym(InvalidArgs), args);
+  int len = le_array_len(xs);
+  Push(xs);
+  Obj str = le_new_str(vm, len);
+  xs = Pop();
+  for (int i = 0; i < len; i++) {
+    Obj c = xs->Array.data[i];
+    if (!le_is_num(c))
+      return le_raise_with(vm, Sym(ExpectInteger), xs);
+    str->Bytes.data[i] = (char)(le_obj2int(c));
+  }
+  str->Bytes.data[len] = '\0';
+  vm->result = str;
+  return Le_OK;
+}
+
 
 // ===== I/O =====
 
@@ -2062,6 +2085,7 @@ static int evalPair(LeVM* vm, Obj xs) {
   if (first == Sym(PrimStrGet))   return evalPrimStrGet(vm, args);
   if (first == Sym(PrimStrEq))    return evalPrimStrEq(vm, args);
   if (first == Sym(PrimStrCat))   return evalPrimStrCat(vm, args);
+  if (first == Sym(PrimStrMake))  return evalPrimStrMake(vm, args);
   if (first == Sym(PrimPutc))     return evalPrimPutc(vm, args);
   if (first == Sym(PrimGetc))     return evalPrimGetc(vm, args);
   if (first == Sym(PrimPrint))    return evalPrimPrint(vm, args);
