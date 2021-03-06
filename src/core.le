@@ -493,6 +493,9 @@
 (de (exit Code)
   (%prim:exit (if Code Code 0)))
 
+(de (sys:gc)
+  (%prim:gc))
+
 
 ;; Array 2
 ;; =====================================

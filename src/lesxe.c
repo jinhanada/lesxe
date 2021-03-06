@@ -51,7 +51,7 @@ enum {
       SymPrimBytesNew, SymPrimBytesGet, SymPrimBytesSet, SymPrimBytesLen,
       /* i/o */ SymPrimPutc, SymPrimGetc, SymPrimPrint,
       /* error */ SymPrimRaise,
-      /* system */ SymPrimExit,
+      /* system */ SymPrimExit, SymPrimGC,
       
       /* errors */
       SymError, SymUndefinedSymbol,
@@ -1089,7 +1089,9 @@ static void setupSymbols(LeVM* vm) {
   DefSym(PrimPutc,              "%prim:putc");
   DefSym(PrimGetc,              "%prim:getc");
   DefSym(PrimPrint,             "%prim:print");
+  /* System */
   DefSym(PrimExit,              "%prim:exit");
+  DefSym(PrimGC,                "%prim:gc");
   /* errors */
   DefSym(Error,                 "error");
   DefSym(UndefinedSymbol,       "undefined-symbol");
@@ -2147,6 +2149,14 @@ static int evalPrimExit(LeVM* vm, Obj args) {
   return Le_OK; // avoid warning
 }
 
+static int evalPrimGC(LeVM* vm, Obj args) {
+  // (%prim:gc) => nil
+  //TODO returns some information
+  le_gc(vm);
+  vm->result = nil;
+  return Le_OK;
+}
+
 // ===== Pair =====
 
 static int evalPair(LeVM* vm, Obj xs) {
@@ -2222,6 +2232,7 @@ static int evalPair(LeVM* vm, Obj xs) {
   if (first == Sym(PrimPrint))    return evalPrimPrint(vm, args);
   // System
   if (first == Sym(PrimExit))     return evalPrimExit(vm, args);
+  if (first == Sym(PrimGC))       return evalPrimGC(vm, args);
 
   // eval f
   Push(args);
