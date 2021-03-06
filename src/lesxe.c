@@ -2059,36 +2059,45 @@ static int evalPair(LeVM* vm, Obj xs) {
   first = Pop();
 
   if (first == Sym(Apply))        return evalApply(vm, args);
+  // Arithmetics
   if (first == Sym(PrimAdd))      return evalPrimAdd(vm,  args);
   if (first == Sym(PrimSub))      return evalPrimSub(vm,  args);
   if (first == Sym(PrimMul))      return evalPrimMul(vm,  args);
   if (first == Sym(PrimDiv))      return evalPrimDiv(vm,  args);
   if (first == Sym(PrimMod))      return evalPrimMod(vm,  args);
+  // Compare
   if (first == Sym(PrimEq))       return evalPrimEq(vm,   args);
   if (first == Sym(PrimNot))      return evalPrimNot(vm,  args);
   if (first == Sym(PrimGt))       return evalPrimGt(vm,   args);
+  // Types
   if (first == Sym(PrimTypeOf))   return evalPrimTypeOf(vm, args);
   if (first == Sym(PrimHash))     return evalPrimHash(vm, args);
+  // Array
   if (first == Sym(PrimArrayNew)) return evalPrimArrayNew(vm, args);
   if (first == Sym(PrimArrayGet)) return evalPrimArrayGet(vm, args);
   if (first == Sym(PrimArraySet)) return evalPrimArraySet(vm, args);
   if (first == Sym(PrimArrayLen)) return evalPrimArrayLen(vm, args);
+  // Pair
   if (first == Sym(PrimCons))     return evalPrimCons(vm, args);
   if (first == Sym(PrimCar))      return evalPrimCar(vm, args);
   if (first == Sym(PrimCdr))      return evalPrimCdr(vm, args);
   if (first == Sym(PrimSetCar))   return evalPrimSetCar(vm, args);
   if (first == Sym(PrimSetCdr))   return evalPrimSetCdr(vm, args);
+  // Symbol
   if (first == Sym(PrimSymNew))   return evalPrimSymNew(vm, args);
   if (first == Sym(PrimSymStr))   return evalPrimSymStr(vm, args);
+  // String
   if (first == Sym(PrimStr))      return evalPrimStr(vm, args);
   if (first == Sym(PrimStrLen))   return evalPrimStrLen(vm, args);
   if (first == Sym(PrimStrGet))   return evalPrimStrGet(vm, args);
   if (first == Sym(PrimStrEq))    return evalPrimStrEq(vm, args);
   if (first == Sym(PrimStrCat))   return evalPrimStrCat(vm, args);
   if (first == Sym(PrimStrMake))  return evalPrimStrMake(vm, args);
+  // I/O
   if (first == Sym(PrimPutc))     return evalPrimPutc(vm, args);
   if (first == Sym(PrimGetc))     return evalPrimGetc(vm, args);
   if (first == Sym(PrimPrint))    return evalPrimPrint(vm, args);
+  // System
   if (first == Sym(PrimExit))     return evalPrimExit(vm, args);
 
   // eval f
