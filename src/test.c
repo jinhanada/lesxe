@@ -719,6 +719,15 @@ void test_prim_bytes(LeVM* vm) {
   assert(code == Le_ERR);
 }
 
+void test_prim_raise(LeVM* vm) {
+  int code;
+
+  code = le_eval_str(vm, "(%prim:raise 123)");
+  assert(code == Le_ERR);
+  assert(vm->err = le_int2obj(123));
+}
+
+
 #define test(Name) { printf("%-30s ", #Name); test_##Name(); printf("ok\n"); }
 #define testVM(Name) {                          \
     printf("%-30s ", #Name);                    \
@@ -761,6 +770,7 @@ void test_all() {
   testVM(prim_pair);
   testVM(prim_str);
   testVM(prim_bytes);
+  testVM(prim_raise);
 }
 
 

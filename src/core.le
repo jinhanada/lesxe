@@ -34,6 +34,13 @@
      (fn (X) (%prim:hash X)))
 
 
+;; Error
+;; =====================================
+
+(def raise
+     (fn (Error) (%prim:raise Error)))
+
+
 ;; Array
 ;; =====================================
 (def array:new  (fn (N)      (%prim:array-new N)))

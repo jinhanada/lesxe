@@ -48,6 +48,7 @@ enum {
       /* bytes */
       SymPrimBytesNew, SymPrimBytesGet, SymPrimBytesSet, SymPrimBytesLen,
       /* i/o */ SymPrimPutc, SymPrimGetc, SymPrimPrint,
+      /* error */ SymPrimRaise,
       /* system */ SymPrimExit,
       
       /* errors */
@@ -929,7 +930,7 @@ static void toStrSub(Str* s, Obj x) {
   case Le_bytes:
     putStr(s, "#<Bytes ");
     toStrSub(s, le_int2obj(le_bytes_len(x)));
-    return putStr(s, ">");    
+    return putStr(s, ">");
   }
 
   if (t == Le_unknown)
@@ -1078,6 +1079,8 @@ static void setupSymbols(LeVM* vm) {
   DefSym(PrimBytesGet,          "%prim:bytes-get");
   DefSym(PrimBytesSet,          "%prim:bytes-set!");
   DefSym(PrimBytesLen,          "%prim:bytes-len");
+  /* Error */
+  DefSym(PrimRaise,             "%prim:raise");
   /* I/O */
   DefSym(PrimPutc,              "%prim:putc");
   DefSym(PrimGetc,              "%prim:getc");
@@ -2090,6 +2093,15 @@ static int evalPrimPrint(LeVM* vm, Obj args) {
 }
 
 
+// ===== Error =====
+
+static int evalPrimRaise(LeVM* vm, Obj args) {
+  // (%prim:raise Error) => raise with Error
+  vm->err = Car(args);
+  return Le_ERR;
+}
+
+
 // ===== System =====
 
 static int evalPrimExit(LeVM* vm, Obj args) {
@@ -2168,7 +2180,9 @@ static int evalPair(LeVM* vm, Obj xs) {
   if (first == Sym(PrimBytesNew)) return evalPrimBytesNew(vm, args);
   if (first == Sym(PrimBytesGet)) return evalPrimBytesGet(vm, args);
   if (first == Sym(PrimBytesSet)) return evalPrimBytesSet(vm, args);
-  if (first == Sym(PrimBytesLen)) return evalPrimBytesLen(vm, args);  
+  if (first == Sym(PrimBytesLen)) return evalPrimBytesLen(vm, args);
+  // Error
+  if (first == Sym(PrimRaise))    return evalPrimRaise(vm, args);
   // I/O
   if (first == Sym(PrimPutc))     return evalPrimPutc(vm, args);
   if (first == Sym(PrimGetc))     return evalPrimGetc(vm, args);
