@@ -906,6 +906,10 @@ static void toStrArrayBody(Str* s, Obj xs) {
   }
 }
 
+static void unknownToStr(Str* s, Obj x) {
+  DIE("toStr:unknown %p isObj %d ('%s')", x, le_is_obj(x), extractStr(s));  
+}
+
 static void toStrSub(Str* s, Obj x) {
   int t = le_typeof(x);
   switch (t) {
@@ -940,9 +944,7 @@ static void toStrSub(Str* s, Obj x) {
     return putStr(s, ">");
   }
 
-  if (t == Le_unknown) {
-    DIE("toStr:unknown %p isObj %d ('%s')", x, le_is_obj(x), extractStr(s));
-  }
+  if (t == Le_unknown) unknownToStr(s, x);
 
   char buf[1024];
   snprintf(buf, 1024, "#<Unimplemented toStr for %d>", t);

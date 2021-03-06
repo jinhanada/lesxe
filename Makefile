@@ -3,6 +3,7 @@ OUT = ./out
 BIN = ./bin
 SRCS = $(SRC)/lesxe.c $(SRC)/lesxe.h
 
+CFLAGS += -g
 
 .PHONY: run
 run: all
