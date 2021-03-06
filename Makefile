@@ -4,6 +4,11 @@ BIN = ./bin
 SRCS = $(SRC)/lesxe.c $(SRC)/lesxe.h
 
 
+.PHONY: run
+run: all
+	rlwrap ./bin/lesxe
+
+
 .PHONY: all
 all: $(BIN)/lesxe $(BIN)/text2c
 
