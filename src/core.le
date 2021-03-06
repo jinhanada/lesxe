@@ -176,6 +176,10 @@
 
 (def strfy (fn (S) (%prim:str S)))
 
+(def str:get (fn (S I) (%prim:str-get S I)))
+
+(def str:len (fn (S) (%prim:str-len S)))
+
 (def str:cat
      (fn (Xs) (%prim:str-cat Xs)))
 
@@ -465,6 +469,17 @@
 ;; Pair 2
 ;; =====================================
 
+(de (list:reverse! Xs)
+  ;; in-place
+  (let ((Last nil)
+        (Next nil))
+    (while Xs
+      (set! Next (cdr Xs))
+      (set-cdr! Xs Last)
+      (set! Last Xs)
+      (set! Xs Next))
+    Last))
+
 (de (list:cons* X . Xs)
   ;; (cons* 1 2 3) => (1 2 . 3)
   ;; (cons* 1 2 '(3 4)) => (1 2 3 4)
@@ -474,3 +489,15 @@
           (cons X (apply list:cons* Xs)))
       X))
 
+
+;; String 2
+;; =====================================
+
+(de (str:chars S)
+  (let ((I   0)
+        (Len (str:len S))
+        (Xs  nil))
+    (while (> Len I)
+      (set! Xs (cons (str:get S I) Xs))
+      (set! I (+ I 1)))
+    (list:reverse! Xs)))

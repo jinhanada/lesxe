@@ -659,6 +659,37 @@ void test_prim_str(LeVM* vm) {
   code = le_eval_str(vm, src);
   AssertOK;
   assert(vm->result == nil);
+
+  // len
+  src = "(%prim:str-len \"\")";
+  code = le_eval_str(vm, src);
+  AssertOK;
+  assert(vm->result = le_int2obj(0));
+  
+  src = "(%prim:str-len \"foo\")";
+  code = le_eval_str(vm, src);
+  AssertOK;
+  assert(vm->result = le_int2obj(3));
+
+  // get
+  src = "(%prim:str-get \"foo\" 0)";
+  code = le_eval_str(vm, src);
+  AssertOK;
+  assert(vm->result = le_int2obj('f'));
+
+  src = "(%prim:str-get \"foo\" 2)";
+  code = le_eval_str(vm, src);
+  AssertOK;
+  assert(vm->result = le_int2obj('o'));
+
+  // get: out of range
+  src = "(%prim:str-get \"foo\" -1)";
+  code = le_eval_str(vm, src);
+  assert(code == Le_ERR);
+
+  src = "(%prim:str-get \"foo\" 3)";
+  code = le_eval_str(vm, src);
+  assert(code == Le_ERR);
 }
 
 #define test(Name) { printf("%-30s ", #Name); test_##Name(); printf("ok\n"); }

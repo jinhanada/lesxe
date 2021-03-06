@@ -42,7 +42,7 @@ enum {
       /* array */ SymPrimArrayNew, SymPrimArrayGet, SymPrimArraySet, SymPrimArrayLen,
       /* pair */ SymPrimCons, SymPrimCar, SymPrimCdr, SymPrimSetCar, SymPrimSetCdr,
       /* symbol */ SymPrimSymNew, SymPrimSymStr,
-      /* string */ SymPrimStr, SymPrimStrEq, SymPrimStrCat,
+      /* string */ SymPrimStr, SymPrimStrLen, SymPrimStrGet, SymPrimStrEq, SymPrimStrCat,
       /* i/o */ SymPrimPutc, SymPrimGetc, SymPrimPrint,
       /* system */ SymPrimExit,
       
@@ -688,6 +688,11 @@ Public int le_str_len(Obj s) {
   return s->Bytes.size - 1; // null terminated
 }
 
+Public char le_str_get(Obj s, int i) {
+  // No bound and type check, be careful
+  return (char)s->Bytes.data[i];
+}
+
 Public Obj le_str_concat(LeVM* vm, Obj a, Obj b) {
   // returns a+b
   int len_a = le_str_len(a);
@@ -1014,31 +1019,41 @@ static void setupSymbols(LeVM* vm) {
   DefSym(Func,                  "func");
   DefSym(Bytes,                 "bytes");
   DefSym(String,                "string");  
-  /* primitives */
+  /* ===== primitives ===== */
+  /* Arithmetics */
   DefSym(PrimAdd,               "%prim:add");
   DefSym(PrimSub,               "%prim:sub");
   DefSym(PrimMul,               "%prim:mul");
   DefSym(PrimDiv,               "%prim:div");
   DefSym(PrimMod,               "%prim:mod");
+  /* Compare */
   DefSym(PrimEq,                "%prim:eq");
   DefSym(PrimNot,               "%prim:not");
   DefSym(PrimGt,                "%prim:gt");
+  /* Types */
   DefSym(PrimTypeOf,            "%prim:type-of");
   DefSym(PrimHash,              "%prim:hash");
+  /* Array */
   DefSym(PrimArrayNew,          "%prim:array-new");
   DefSym(PrimArrayGet,          "%prim:array-get");
   DefSym(PrimArraySet,          "%prim:array-set!");
   DefSym(PrimArrayLen,          "%prim:array-len");
+  /* Pair */
   DefSym(PrimCons,              "%prim:cons");
   DefSym(PrimCar,               "%prim:car");
   DefSym(PrimCdr,               "%prim:cdr");
   DefSym(PrimSetCar,            "%prim:set-car!");
   DefSym(PrimSetCdr,            "%prim:set-cdr!");
+  /* Symbol */
   DefSym(PrimSymNew,            "%prim:sym-new");
   DefSym(PrimSymStr,            "%prim:sym-str");
+  /* String */
   DefSym(PrimStr,               "%prim:str");
+  DefSym(PrimStrLen,            "%prim:str-len");
+  DefSym(PrimStrGet,            "%prim:str-get");
   DefSym(PrimStrEq,             "%prim:str-eq");
   DefSym(PrimStrCat,            "%prim:str-cat");
+  /* I/O */
   DefSym(PrimPutc,              "%prim:putc");
   DefSym(PrimGetc,              "%prim:getc");
   DefSym(PrimPrint,             "%prim:print");
@@ -1897,6 +1912,31 @@ static int evalPrimStrCat(LeVM* vm, Obj args) {
   return Le_OK;
 }
 
+static int evalPrimStrLen(LeVM* vm, Obj args) {
+  Obj str = Car(args);
+  if (!le_is_string(str))
+    return le_raise_with(vm, Sym(InvalidArgs), args);
+  
+  int len = le_str_len(str);
+  vm->result = le_int2obj(len);
+  return Le_OK;
+}
+
+static int evalPrimStrGet(LeVM* vm, Obj args) {
+  Obj str = Car(args);
+  Obj obj_i = Second(args);
+  if (!(le_is_string(str) && le_is_num(obj_i)))
+    return le_raise_with(vm, Sym(InvalidArgs), args);
+  
+  int i = le_obj2int(obj_i);
+  if (i < 0 || i >= le_str_len(str))
+    return le_raise_with(vm, Sym(OutOfRange), args);
+  
+  char c = le_str_get(str, i);
+  vm->result = le_int2obj(c);
+  return Le_OK;
+}
+
 
 // ===== I/O =====
 
@@ -2018,6 +2058,8 @@ static int evalPair(LeVM* vm, Obj xs) {
   if (first == Sym(PrimSymNew))   return evalPrimSymNew(vm, args);
   if (first == Sym(PrimSymStr))   return evalPrimSymStr(vm, args);
   if (first == Sym(PrimStr))      return evalPrimStr(vm, args);
+  if (first == Sym(PrimStrLen))   return evalPrimStrLen(vm, args);
+  if (first == Sym(PrimStrGet))   return evalPrimStrGet(vm, args);
   if (first == Sym(PrimStrEq))    return evalPrimStrEq(vm, args);
   if (first == Sym(PrimStrCat))   return evalPrimStrCat(vm, args);
   if (first == Sym(PrimPutc))     return evalPrimPutc(vm, args);
