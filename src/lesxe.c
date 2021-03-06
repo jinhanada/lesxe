@@ -1,4 +1,5 @@
 #include "lesxe.h"
+#include "corelib.h"
 
 
 // Conventions
@@ -2312,16 +2313,10 @@ Public int le_eval_str(LeVM* vm, char* src) {
   return le_eval(vm, vm->result);
 }
 
-Public int le_load_file(LeVM* vm, char* fname) {
-  char* src = readTextFile(fname);
-
-  if (src == NULL) {
-    Obj filename = le_new_str_from(vm, fname);
-    return RaiseWith(FileNotFound, filename);
-  }
-
+Public int le_eval_all_str(LeVM* vm, char* src) {
   vm->src = src;
   vm->p   = src;
+  
   int code = Le_OK;
   int i = 0;
   while (code == Le_OK && *vm->p != '\0') {
@@ -2332,8 +2327,25 @@ Public int le_load_file(LeVM* vm, char* fname) {
     ExpectOK;
   }
 
+  if (code == Le_EOF) return Le_OK;
+  return code;
+}
+
+Public int le_load_file(LeVM* vm, char* fname) {
+  char* src = readTextFile(fname);
+
+  if (src == NULL) {
+    Obj filename = le_new_str_from(vm, fname);
+    return RaiseWith(FileNotFound, filename);
+  }
+
+  int code = le_eval_all_str(vm, src);
   free(src);
-  return Le_OK;
+  return code;
+}
+
+Public int le_load_corelib(LeVM* vm) {
+  return le_eval_all_str(vm, corelib_src);
 }
 
 

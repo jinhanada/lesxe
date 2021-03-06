@@ -17,7 +17,7 @@ static void debugPrint(char* filename, int line, char* fmt, ...) {
 int main(int argc, char** argv) {
   LeVM* vm = le_create_vm();
 
-  int code = le_load_file(vm, "./src/core.le"); // TODO: amalgamate!
+  int code = le_load_corelib(vm);
   if (code != Le_OK) DIE("%s", le_err_str(vm));
 
   printf("lesxe stage: sprout\n");

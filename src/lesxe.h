@@ -116,6 +116,7 @@ char* le_err_str(LeVM* vm);
 int le_eval(LeVM* vm, LeObj* expr);
 int le_eval_str(LeVM* vm, char* str);
 int le_load_file(LeVM* vm, char* fname);
+int le_load_corelib(LeVM* vm);
 
 
 // REPL

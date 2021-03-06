@@ -1,2 +1,4 @@
 out
-bin/lesxe
+bin/*
+!bin/.keep
+src/corelib.h
