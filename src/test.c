@@ -68,7 +68,7 @@ void test_object_header() {
 
 
 void test_memory() {
-  int cells = 1000;
+  int cells = 10000;
   LeVM* vm = le_new_vm(cells);
   assert(vm->cells == cells);
   assert(vm->new != vm->old);
@@ -78,7 +78,7 @@ void test_memory() {
 
 
 void test_allot_object() {
-  LeVM* vm  = le_new_vm(1000);
+  LeVM* vm  = le_new_vm(10000);
   Obj  o   = newObj(vm, 3, T_ARRAY);
   Obj  n42 = le_int2obj(42);
 
@@ -97,7 +97,7 @@ void test_allot_object() {
 
 
 void test_bytes_object() {
-  LeVM* vm = le_new_vm(1000);
+  LeVM* vm = le_new_vm(10000);
   Obj b = newBytesObj(vm, 3, T_BYTES);
 
   assert(cellsOf(b->header) == 2);
@@ -119,7 +119,7 @@ void test_bytes_object() {
 
 
 void test_temporary_stack() {
-  LeVM* vm = le_new_vm(1000);
+  LeVM* vm = le_new_vm(10000);
 
   Obj n42 = le_int2obj(42);
   Obj* stack = vm->tmp; // スタックのアドレスを書き換えてしまうバグ検出用
@@ -141,7 +141,7 @@ void test_temporary_stack() {
 }
 
 void test_gc_swap() {
-  LeVM* vm = le_new_vm(1000);
+  LeVM* vm = le_new_vm(10000);
   Obj* new = vm->new;
   Obj* old = vm->old;
 
@@ -154,7 +154,7 @@ void test_gc_swap() {
 }
 
 void test_gc_move() {
-  LeVM* vm = le_new_vm(1000);
+  LeVM* vm = le_new_vm(10000);
   Obj n42 = le_int2obj(42);
 
   Obj o = newObj(vm, 1, T_ARRAY);
@@ -182,7 +182,7 @@ void test_gc_integration() {
 
   // check scanning root
   { 
-    LeVM* vm = le_new_vm(1000);
+    LeVM* vm = le_new_vm(10000);
     Obj *r = vm->root->Array.data;
     vm->root->Array.data[0] = n42;
     Obj obj = newObj(vm, 1, T_ARRAY);
@@ -211,7 +211,7 @@ void test_gc_integration() {
 
   // check cyclic test
   {
-    LeVM* vm = le_new_vm(1000);
+    LeVM* vm = le_new_vm(10000);
     Obj root = vm->root;
     Obj obj1 = newObj(vm, 1, T_ARRAY);
     Obj obj2 = newObj(vm, 1, T_ARRAY);
@@ -242,7 +242,7 @@ void test_gc_integration() {
 
   // temporary stack
   {
-    LeVM* vm = le_new_vm(1000);
+    LeVM* vm = le_new_vm(10000);
     Obj obj1 = newObj(vm, 1, T_ARRAY);
     Obj obj2 = newObj(vm, 1, T_ARRAY);
     Obj obj3 = newObj(vm, 1, T_ARRAY);
@@ -267,7 +267,7 @@ void test_gc_integration() {
 
   // byte object
   {
-    LeVM* vm = le_new_vm(1000);
+    LeVM* vm = le_new_vm(10000);
     LeObj* b = newBytesObj(vm, 2, T_BYTES);
     b->Bytes.data[0] = 42;
     b->Bytes.data[1] = 43;
