@@ -14,7 +14,8 @@
 (def <  (fn (A B) (not (>= A B))))
 (def <= (fn (A B) (not (> A B))))
 
-(def abs (fn (N) (if (> 0 N) (- 0 N) N)))
+(def neg (fn (N) (- 0 N)))
+(def abs (fn (N) (if (> 0 N) (neg N) N)))
 
 
 ;; Types
@@ -405,6 +406,7 @@
 
 
 ;; Macros
+;; =====================================
 
 (demac (de Def . Body)
   (let ((Name (car Def))
