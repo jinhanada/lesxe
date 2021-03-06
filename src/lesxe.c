@@ -111,7 +111,7 @@ struct LeObj {
   };
 };
 
-#define OBJECT_HEADER_CELLS 2
+#define OBJECT_HEADER_CELLS 2 // header and hash
 
 
 // ===== VM =====
