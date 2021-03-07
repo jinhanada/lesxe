@@ -1540,12 +1540,11 @@ static int applyFunc(LeVM* vm, Obj func, Obj args) {
 
   // swap env
   Push(vm->env);
-  Func f = func->Func;
-  vm->env = f.env;
+  vm->env = func->Func.env;
   
   // create env
   Push(func);
-  Obj vars = f.vars;
+  Obj vars = func->Func.vars;
   Obj env = nil;
   while (vars != nil) {
     // rest
@@ -1569,11 +1568,12 @@ static int applyFunc(LeVM* vm, Obj func, Obj args) {
   func = Pop();
 
   // apply
-  int code = evalExprs(vm, f.code);
+  int code = evalExprs(vm, func->Func.code);
   // result or err is set on vm
   
   // restore env
   vm->env = Pop();
+
   return code;
 }
 
