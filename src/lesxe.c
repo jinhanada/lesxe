@@ -1598,7 +1598,7 @@ static int evalApply(LeVM* vm, Obj xs) {
 
 // Primitive Handlers
 // =============================================================================
-// SymPrimAddならevalPrimAddというように、必ずevalPrimNameという名前にすること
+// SymPrimAddならprimAddというように、必ずprimNameという名前にすること
 
 // SymbolTableのサイズを利用。少し大きくなるけどコードを簡単にしたいから仕方ない
 typedef int(*PrimHandler)(LeVM* vm, Obj args);
@@ -1617,28 +1617,28 @@ PrimHandler PrimitiveTable[SymTableSize];
   int nb = le_obj2int(b);                                             
 
 
-static int evalPrimAdd(LeVM* vm, Obj args) {
+static int primAdd(LeVM* vm, Obj args) {
   ARITH_PROLOGUE;
   Obj r = le_int2obj(na + nb);
   vm->result = r;
   return Le_OK;
 }
 
-static int evalPrimSub(LeVM* vm, Obj args) {
+static int primSub(LeVM* vm, Obj args) {
   ARITH_PROLOGUE;
   Obj r = le_int2obj(na - nb);
   vm->result = r;
   return Le_OK;
 }
 
-static int evalPrimMul(LeVM* vm, Obj args) {
+static int primMul(LeVM* vm, Obj args) {
   ARITH_PROLOGUE;
   Obj r = le_int2obj(na * nb);
   vm->result = r;
   return Le_OK;
 }
 
-static int evalPrimDiv(LeVM* vm, Obj args) {
+static int primDiv(LeVM* vm, Obj args) {
   ARITH_PROLOGUE;
 
   if (nb == 0)
@@ -1649,7 +1649,7 @@ static int evalPrimDiv(LeVM* vm, Obj args) {
   return Le_OK;
 }
 
-static int evalPrimMod(LeVM* vm, Obj args) {
+static int primMod(LeVM* vm, Obj args) {
   ARITH_PROLOGUE;
 
   if (nb == 0)
@@ -1663,7 +1663,7 @@ static int evalPrimMod(LeVM* vm, Obj args) {
 
 // ===== Compare =====
 
-static int evalPrimEq(LeVM* vm, Obj args) {
+static int primEq(LeVM* vm, Obj args) {
   SaveStack;
   Obj a = Car(args);
   Obj b = Second(args);
@@ -1672,13 +1672,13 @@ static int evalPrimEq(LeVM* vm, Obj args) {
   return Le_OK;
 }
 
-static int evalPrimNot(LeVM* vm, Obj args) {
+static int primNot(LeVM* vm, Obj args) {
   Obj x = Car(args);
   vm->result = x == nil ? Sym(True) : nil;
   return Le_OK;
 }
 
-static int evalPrimGt(LeVM* vm, Obj args) {
+static int primGt(LeVM* vm, Obj args) {
   SaveStack;
   Obj a = Car(args);
   Obj b = Second(args);
@@ -1694,7 +1694,7 @@ static int evalPrimGt(LeVM* vm, Obj args) {
 
 // ===== Types =====
 
-static int evalPrimTypeOf(LeVM* vm, Obj args) {
+static int primTypeOf(LeVM* vm, Obj args) {
   // (%prim:type-of Obj) => Symbol
   Obj x = Car(args);
   int ty = le_typeof(x);
@@ -1713,7 +1713,7 @@ static int evalPrimTypeOf(LeVM* vm, Obj args) {
   return Le_OK;
 }
 
-static int evalPrimHash(LeVM* vm, Obj args) {
+static int primHash(LeVM* vm, Obj args) {
   Obj x = Car(args);
   vm->result = le_get_hash(x);
   return Le_OK;
@@ -1722,7 +1722,7 @@ static int evalPrimHash(LeVM* vm, Obj args) {
 
 // ===== Array =====
 
-static int evalPrimArrayNew(LeVM* vm, Obj args) {
+static int primArrayNew(LeVM* vm, Obj args) {
   Obj x = Car(args);
   if (!le_is_num(x))
     return RaiseWith(InvalidArgs, args);
@@ -1731,7 +1731,7 @@ static int evalPrimArrayNew(LeVM* vm, Obj args) {
   return Le_OK;
 }
 
-static int evalPrimArrayGet(LeVM* vm, Obj args) {
+static int primArrayGet(LeVM* vm, Obj args) {
   Obj xs = Car(args);
   Obj obj_i  = Second(args);
   if (!(le_is_array(xs) && le_is_num(obj_i)))
@@ -1743,7 +1743,7 @@ static int evalPrimArrayGet(LeVM* vm, Obj args) {
   return Le_OK;
 }
 
-static int evalPrimArraySet(LeVM* vm, Obj args) {
+static int primArraySet(LeVM* vm, Obj args) {
   Obj xs = Car(args);
   Obj obj_i  = Second(args);
   Obj val = Third(args);
@@ -1757,7 +1757,7 @@ static int evalPrimArraySet(LeVM* vm, Obj args) {
   return Le_OK;
 }
 
-static int evalPrimArrayLen(LeVM* vm, Obj args) {
+static int primArrayLen(LeVM* vm, Obj args) {
   Obj xs = Car(args);
   if (!le_is_array(xs))
     return RaiseWith(InvalidArgs, args);
@@ -1768,12 +1768,12 @@ static int evalPrimArrayLen(LeVM* vm, Obj args) {
 
 // ===== Pair =====
 
-static int evalPrimCons(LeVM* vm, Obj args) {
+static int primCons(LeVM* vm, Obj args) {
   vm->result = Cons(vm, Car(args), Second(args));
   return Le_OK;
 }
 
-static int evalPrimCar(LeVM* vm, Obj args) {
+static int primCar(LeVM* vm, Obj args) {
   Obj xs = Car(args);
   if (xs != nil && !le_is_pair(xs))
     return RaiseWith(InvalidArgs, args);
@@ -1781,7 +1781,7 @@ static int evalPrimCar(LeVM* vm, Obj args) {
   return Le_OK;
 }
 
-static int evalPrimCdr(LeVM* vm, Obj args) {
+static int primCdr(LeVM* vm, Obj args) {
   Obj xs = Car(args);
   if (xs != nil && !le_is_pair(xs))
     return RaiseWith(InvalidArgs, args);
@@ -1789,7 +1789,7 @@ static int evalPrimCdr(LeVM* vm, Obj args) {
   return Le_OK;
 }
 
-static int evalPrimSetCar(LeVM* vm, Obj args) {
+static int primSetCar(LeVM* vm, Obj args) {
   Obj xs = Car(args);
   Obj x  = Second(args);
   if (xs != nil && !le_is_pair(xs))
@@ -1799,7 +1799,7 @@ static int evalPrimSetCar(LeVM* vm, Obj args) {
   return Le_OK;
 }
 
-static int evalPrimSetCdr(LeVM* vm, Obj args) {
+static int primSetCdr(LeVM* vm, Obj args) {
   Obj xs = Car(args);
   Obj x  = Second(args);
   if (xs != nil && !le_is_pair(xs))
@@ -1812,7 +1812,7 @@ static int evalPrimSetCdr(LeVM* vm, Obj args) {
 
 // ===== Symbol =====
 
-static int evalPrimSymNew(LeVM* vm, Obj args) {
+static int primSymNew(LeVM* vm, Obj args) {
   // (%prim:sym-new Str) => Symbol
   Obj name = Car(args);
   if (!le_is_string(name))
@@ -1822,7 +1822,7 @@ static int evalPrimSymNew(LeVM* vm, Obj args) {
   return Le_OK;
 }
 
-static int evalPrimSymStr(LeVM* vm, Obj args) {
+static int primSymStr(LeVM* vm, Obj args) {
   // (%prim:sym-str Sym) => String
   Obj sym = Car(args);
   if (!le_is_symbol(sym))
@@ -1834,7 +1834,7 @@ static int evalPrimSymStr(LeVM* vm, Obj args) {
 
 // ===== String =====
 
-static int evalPrimStr(LeVM* vm, Obj args) {
+static int primStr(LeVM* vm, Obj args) {
   // (%prim:str Obj) => String
   Obj x = Car(args);
   char* s = toStr(x);
@@ -1843,7 +1843,7 @@ static int evalPrimStr(LeVM* vm, Obj args) {
   return Le_OK;
 }
 
-static int evalPrimStrEq(LeVM* vm, Obj args) {
+static int primStrEq(LeVM* vm, Obj args) {
   // (%prim:str-eq A B) => true/nil
   Obj a = Car(args);
   Obj b = Second(args);
@@ -1853,7 +1853,7 @@ static int evalPrimStrEq(LeVM* vm, Obj args) {
   return Le_OK;
 }
 
-static int evalPrimStrCat(LeVM* vm, Obj args) {
+static int primStrCat(LeVM* vm, Obj args) {
   // (%prim:str-cat ListOfStrings) => String
   SaveStack;
   Obj xs = Car(args);
@@ -1888,7 +1888,7 @@ static int evalPrimStrCat(LeVM* vm, Obj args) {
   return Le_OK;
 }
 
-static int evalPrimStrLen(LeVM* vm, Obj args) {
+static int primStrLen(LeVM* vm, Obj args) {
   Obj str = Car(args);
   if (!le_is_string(str))
     return RaiseWith(InvalidArgs, args);
@@ -1898,7 +1898,7 @@ static int evalPrimStrLen(LeVM* vm, Obj args) {
   return Le_OK;
 }
 
-static int evalPrimStrGet(LeVM* vm, Obj args) {
+static int primStrGet(LeVM* vm, Obj args) {
   Obj str = Car(args);
   Obj obj_i = Second(args);
   if (!(le_is_string(str) && le_is_num(obj_i)))
@@ -1913,7 +1913,7 @@ static int evalPrimStrGet(LeVM* vm, Obj args) {
   return Le_OK;
 }
 
-static int evalPrimStrMake(LeVM* vm, Obj args) {
+static int primStrMake(LeVM* vm, Obj args) {
   // (%prim:str-make ArrayOfChars) => String
   Obj xs = Car(args);
   if (!le_is_array(xs))
@@ -1936,7 +1936,7 @@ static int evalPrimStrMake(LeVM* vm, Obj args) {
 
 // ===== Bytes =====
 
-static int evalPrimBytesNew(LeVM* vm, Obj args) {
+static int primBytesNew(LeVM* vm, Obj args) {
   Obj x = Car(args);
   if (!le_is_num(x))
     return RaiseWith(ExpectInteger, args);
@@ -1945,7 +1945,7 @@ static int evalPrimBytesNew(LeVM* vm, Obj args) {
   return Le_OK;
 }
 
-static int evalPrimBytesGet(LeVM* vm, Obj args) {
+static int primBytesGet(LeVM* vm, Obj args) {
   Obj xs = Car(args);
   Obj obj_i  = Second(args);
   if (!(le_is_bytes(xs) && le_is_num(obj_i)))
@@ -1958,7 +1958,7 @@ static int evalPrimBytesGet(LeVM* vm, Obj args) {
   return Le_OK;
 }
 
-static int evalPrimBytesSet(LeVM* vm, Obj args) {
+static int primBytesSet(LeVM* vm, Obj args) {
   Obj xs = Car(args);
   Obj obj_i  = Second(args);
   Obj val = Third(args);
@@ -1974,7 +1974,7 @@ static int evalPrimBytesSet(LeVM* vm, Obj args) {
   return Le_OK;
 }
 
-static int evalPrimBytesLen(LeVM* vm, Obj args) {
+static int primBytesLen(LeVM* vm, Obj args) {
   Obj xs = Car(args);
   if (!le_is_bytes(xs))
     return RaiseWith(InvalidArgs, args);
@@ -1985,7 +1985,7 @@ static int evalPrimBytesLen(LeVM* vm, Obj args) {
 
 // ===== Read =====
 
-static int evalPrimReadStr(LeVM* vm, Obj args) {
+static int primReadStr(LeVM* vm, Obj args) {
   Obj s = Car(args);
   ExpectType(string, s);
   return le_read_str(vm, le_cstr_of(s)); // result holds expression
@@ -1994,7 +1994,7 @@ static int evalPrimReadStr(LeVM* vm, Obj args) {
 
 // ===== I/O =====
 
-static int evalPrimPutc(LeVM* vm, Obj args) {
+static int primPutc(LeVM* vm, Obj args) {
   // (%prim:putc FileDescriptor Char) => Char
   Obj var_fd   = Car(args);
   Obj var_char = Second(args);
@@ -2013,7 +2013,7 @@ static int evalPrimPutc(LeVM* vm, Obj args) {
   return Le_OK;
 }
 
-static int evalPrimGetc(LeVM* vm, Obj args) {
+static int primGetc(LeVM* vm, Obj args) {
   // (%prim:getc FileDescriptor) => char(integer)
   Obj var_fd = Car(args);
   if (!le_is_num(var_fd))
@@ -2029,7 +2029,7 @@ static int evalPrimGetc(LeVM* vm, Obj args) {
   return Le_OK;
 }
 
-static int evalPrimPrint(LeVM* vm, Obj args) {
+static int primPrint(LeVM* vm, Obj args) {
   // (%prim:print FileDescriptor String) => String
   Obj obj_fd = Car(args);
   Obj str    = Second(args);
@@ -2049,7 +2049,7 @@ static int evalPrimPrint(LeVM* vm, Obj args) {
   return Le_OK;
 }
 
-static int evalPrimReadTextFile(LeVM* vm, Obj args) {
+static int primReadTextFile(LeVM* vm, Obj args) {
   // (%prim:read-text-file FileName) => String
   Obj fname = Car(args);
   ExpectType(string, fname);
@@ -2061,7 +2061,7 @@ static int evalPrimReadTextFile(LeVM* vm, Obj args) {
   return Le_OK;
 }
 
-static int evalPrimWriteTextFile(LeVM* vm, Obj args) {
+static int primWriteTextFile(LeVM* vm, Obj args) {
   // (%prim:write-text-file FileName String) => String
   Obj fname = Car(args);
   Obj text = Second(args);
@@ -2076,7 +2076,7 @@ static int evalPrimWriteTextFile(LeVM* vm, Obj args) {
 
 // ===== Error =====
 
-static int evalPrimRaise(LeVM* vm, Obj args) {
+static int primRaise(LeVM* vm, Obj args) {
   // (%prim:raise Error) => raise with Error
   vm->err = Car(args);
   return Le_ERR;
@@ -2085,7 +2085,7 @@ static int evalPrimRaise(LeVM* vm, Obj args) {
 
 // ===== System =====
 
-static int evalPrimExit(LeVM* vm, Obj args) {
+static int primExit(LeVM* vm, Obj args) {
   // (%prim:exit Code) => exit with code
   Obj code = Car(args);
 
@@ -2096,7 +2096,7 @@ static int evalPrimExit(LeVM* vm, Obj args) {
   return Le_OK; // avoid warning
 }
 
-static int evalPrimGC(LeVM* vm, Obj args) {
+static int primGC(LeVM* vm, Obj args) {
   // (%prim:gc) => nil
   //TODO returns some information
   le_gc(vm);
@@ -2104,7 +2104,7 @@ static int evalPrimGC(LeVM* vm, Obj args) {
   return Le_OK;
 }
 
-static int evalPrimLoadFile(LeVM* vm, Obj args) {
+static int primLoadFile(LeVM* vm, Obj args) {
   Obj fname = Car(args);
   ExpectType(string, fname);
   return le_load_file(vm, le_cstr_of(fname));
@@ -2400,7 +2400,7 @@ static void setupSymbols(LeVM* vm) {
 #define DefPrim(index, name) {                                   \
     DefSym(Prim##index, "%prim:" name);                          \
     Sym(Prim##index)->Symbol.prim = le_int2obj(SymPrim##index);  \
-    PrimitiveTable[SymPrim##index] = evalPrim##index;            \
+    PrimitiveTable[SymPrim##index] = prim##index;                \
   }
 
 static void setupPrimitives(LeVM* vm) {
