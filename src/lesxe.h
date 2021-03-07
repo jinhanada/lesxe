@@ -93,7 +93,7 @@ LeObj* le_new_func(LeVM* vm, LeObj* code, LeObj* env, LeObj* params);
 
 // VM
 // =============================================================================
-LeVM* le_new_vm(int cells);
+LeVM* le_new_vm(int cells, int repl_buf_size);
 LeVM* le_create_vm();
 void  le_free_vm(LeVM* vm);
 

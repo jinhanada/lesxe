@@ -17,6 +17,7 @@
 // =============================================================================
 
 #define VM_DEFAULT_CELLS (10 * 1024 * 1024 / sizeof(void*)) /* 10Mib */
+#define VM_DEFAULT_REPL_BUF_SIZE 4096
 #define TEMPORARY_STACK_SIZE 2048
 
 
@@ -138,6 +139,8 @@ struct LeVM {
   LeObj* err;
   // Symbols for O(1) access
   LeObj* symTable[SymTableSize];
+  // REPL
+  int replBufSize;
 };
 
   
@@ -1134,8 +1137,10 @@ static void setupVariables(LeVM* vm) {
   SetAsIs(String);
 }
 
-Public LeVM* le_new_vm(int cells) {
+Public LeVM* le_new_vm(int cells, int repl_buf_size) {
   LeVM* vm = calloc(sizeof(LeVM), 1);
+
+  vm->replBufSize = repl_buf_size;
 
   // memory
   vm->cells = cells;
@@ -1154,8 +1159,7 @@ Public LeVM* le_new_vm(int cells) {
 }
 
 Public LeVM* le_create_vm() {
-  // TODO amalgamate core lib
-  return le_new_vm(VM_DEFAULT_CELLS);
+  return le_new_vm(VM_DEFAULT_CELLS, VM_DEFAULT_REPL_BUF_SIZE);
 }
 
 Public void le_free_vm(LeVM* vm) {
@@ -2462,13 +2466,19 @@ static int replRead(LeVM* vm, char* buf, int max) {
   return code;
 }
 
+static void printError(Obj err) {
+  fprintf(stderr, "\e[31m");
+  fprintf(stderr, "%s", toStr(err));
+  fprintf(stderr, "\e[0m\n");
+}
+
 Public int le_repl(LeVM* vm) {
-  char buf[REPL_BUF_LEN];
+  char* buf = calloc(sizeof(char), vm->replBufSize);
 
   while (1) {
     replPrompt(vm);
 
-    int code = replRead(vm, buf, REPL_BUF_LEN);
+    int code = replRead(vm, buf, vm->replBufSize);
     if (code == Le_Continue) continue; // 空白のみの入力
     if (code == Le_EOF)      break;    // Ctrl-D 
     if (code != Le_OK) {
@@ -2481,7 +2491,9 @@ Public int le_repl(LeVM* vm) {
     if (code == Le_OK) {
       printf("%s\n", toStr(vm->result));
     } else {
-      DBG("%s", toStr(vm->err));
+      printError(vm->err);
     }
   }
+
+  free(buf);
 }
