@@ -9,6 +9,7 @@
   static privateFunction
   MacroProc()
   MACRO_VALUE
+  GlobalVariable
   local_variable
 */
 
