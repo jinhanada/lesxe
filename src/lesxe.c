@@ -177,7 +177,7 @@ typedef uint8_t  Byte;
 // Forward declarations
 // =============================================================================
 static char* toStr(Obj);
-
+static void setupVM(LeVM* vm);
 
 // Debug print
 // =============================================================================
@@ -1024,126 +1024,7 @@ static void setGlobal(LeVM* vm, Obj var, Obj val) {
 }
 
 
-// ===== Create & Setup VM =====
-
-#define DefSym(index, name) (vm->symTable[Sym##index] = le_new_sym_from(vm, name))
-
-static void setupSymbols(LeVM* vm) {
-  DefSym(Nil,                   "nil");
-  DefSym(True,                  "true");
-  DefSym(Quote,                 "quote");
-  DefSym(Quasiquote,            "quasiquote");
-  DefSym(Unquote,               "unquote");
-  DefSym(UnquoteSplicing,       "unquote-splicing");
-  DefSym(Let,                   "let");
-  DefSym(Fn,                    "fn");
-  DefSym(Def,                   "def");
-  DefSym(If,                    "if");
-  DefSym(Set,                   "set!");
-  DefSym(While,                 "while");
-  DefSym(Break,                 "break");
-  DefSym(Continue,              "continue");
-  DefSym(Apply,                 "apply");
-  DefSym(Catch,                 "catch");
-  DefSym(PreEval,               "%pre-eval");
-  /* types */
-  DefSym(Number,                "number");
-  DefSym(Array,                 "array");
-  DefSym(Symbol,                "symbol");
-  DefSym(Pair,                  "pair");
-  DefSym(Func,                  "func");
-  DefSym(Bytes,                 "bytes");
-  DefSym(String,                "string");  
-  /* errors */
-  DefSym(Error,                 "error");
-  DefSym(UndefinedSymbol,       "undefined-symbol");
-  DefSym(MalformedFn,           "malformed-fn");
-  DefSym(InvalidArgs,           "invalid-args");
-  DefSym(ExpectInteger,         "expect-integer");
-  DefSym(ZeroDivision,          "zero-division");
-  DefSym(FileNotFound,          "file-not-found");
-  DefSym(InvalidPreEvalProc,    "invalid-pre-eval-proc");
-  DefSym(InvalidFileDescriptor, "invalid-file-descriptor");
-  DefSym(NotAProc,              "not-a-proc");
-  DefSym(OutOfRange,            "out-of-range");
-  DefSym(UnknownError,          "unknown-error");
-}
-
-#define DefPrim(index, name) {                                   \
-    DefSym(Prim##index, "%prim:" name);                          \
-    Sym(Prim##index)->Symbol.prim = le_int2obj(SymPrim##index);  \
-  }
-
-static void setupPrimitives(LeVM* vm) {
- /* Arithmetics */
-  DefPrim(Add,               "add");
-  DefPrim(Sub,               "sub");
-  DefPrim(Mul,               "mul");
-  DefPrim(Div,               "div");
-  DefPrim(Mod,               "mod");
-  /* Compare */
-  DefPrim(Eq,                "eq");
-  DefPrim(Not,               "not");
-  DefPrim(Gt,                "gt");
-  /* Types */
-  DefPrim(TypeOf,            "type-of");
-  DefPrim(Hash,              "hash");
-  /* Array */
-  DefPrim(ArrayNew,          "array-new");
-  DefPrim(ArrayGet,          "array-get");
-  DefPrim(ArraySet,          "array-set!");
-  DefPrim(ArrayLen,          "array-len");
-  /* Pair */
-  DefPrim(Cons,              "cons");
-  DefPrim(Car,               "car");
-  DefPrim(Cdr,               "cdr");
-  DefPrim(SetCar,            "set-car!");
-  DefPrim(SetCdr,            "set-cdr!");
-  /* Symbol */
-  DefPrim(SymNew,            "sym-new");
-  DefPrim(SymStr,            "sym-str");
-  /* String */
-  DefPrim(Str,               "str");
-  DefPrim(StrLen,            "str-len");
-  DefPrim(StrGet,            "str-get");
-  DefPrim(StrEq,             "str-eq");
-  DefPrim(StrCat,            "str-cat");
-  DefPrim(StrMake,           "str-make");
-  /* Bytes */
-  DefPrim(BytesNew,          "bytes-new");
-  DefPrim(BytesGet,          "bytes-get");
-  DefPrim(BytesSet,          "bytes-set!");
-  DefPrim(BytesLen,          "bytes-len");
-  /* Error */
-  DefPrim(Raise,             "raise");
-  /* Read */
-  DefPrim(ReadStr,           "read-str");
-  /* I/O */
-  DefPrim(Putc,              "putc");
-  DefPrim(Getc,              "getc");
-  DefPrim(Print,             "print");
-  DefPrim(ReadTextFile,      "read-text-file");
-  DefPrim(WriteTextFile,     "write-text-file");
-  /* System */
-  DefPrim(Exit,              "exit");
-  DefPrim(GC,                "gc");
-  DefPrim(LoadFile,          "load-file");  
-}
-
-#define SetAsIs(symname) (setGlobal(vm, Sym(symname), Sym(symname)))
-
-static void setupVariables(LeVM* vm) {
-  setGlobal(vm, Sym(Nil), nil);
-  setGlobal(vm, Sym(PreEval), nil);
-  SetAsIs(True);
-  SetAsIs(Number);
-  SetAsIs(Array);
-  SetAsIs(Symbol);
-  SetAsIs(Pair);
-  SetAsIs(Func);
-  SetAsIs(Bytes);
-  SetAsIs(String);
-}
+// ===== Create VM =====
 
 Public LeVM* le_new_vm(int cells, int repl_buf_size) {
   LeVM* vm = calloc(sizeof(LeVM), 1);
@@ -1160,9 +1041,7 @@ Public LeVM* le_new_vm(int cells, int repl_buf_size) {
   // root
   vm->root = newRoot(vm);
 
-  setupSymbols(vm);
-  setupPrimitives(vm);
-  setupVariables(vm);
+  setupVM(vm);
 
   return vm;
 }
@@ -2505,4 +2384,133 @@ Public int le_repl(LeVM* vm) {
   }
 
   free(buf);
+}
+
+
+// VM Setup
+// =============================================================================
+
+#define DefSym(index, name) (vm->symTable[Sym##index] = le_new_sym_from(vm, name))
+
+static void setupSymbols(LeVM* vm) {
+  DefSym(Nil,                   "nil");
+  DefSym(True,                  "true");
+  DefSym(Quote,                 "quote");
+  DefSym(Quasiquote,            "quasiquote");
+  DefSym(Unquote,               "unquote");
+  DefSym(UnquoteSplicing,       "unquote-splicing");
+  DefSym(Let,                   "let");
+  DefSym(Fn,                    "fn");
+  DefSym(Def,                   "def");
+  DefSym(If,                    "if");
+  DefSym(Set,                   "set!");
+  DefSym(While,                 "while");
+  DefSym(Break,                 "break");
+  DefSym(Continue,              "continue");
+  DefSym(Apply,                 "apply");
+  DefSym(Catch,                 "catch");
+  DefSym(PreEval,               "%pre-eval");
+  /* types */
+  DefSym(Number,                "number");
+  DefSym(Array,                 "array");
+  DefSym(Symbol,                "symbol");
+  DefSym(Pair,                  "pair");
+  DefSym(Func,                  "func");
+  DefSym(Bytes,                 "bytes");
+  DefSym(String,                "string");  
+  /* errors */
+  DefSym(Error,                 "error");
+  DefSym(UndefinedSymbol,       "undefined-symbol");
+  DefSym(MalformedFn,           "malformed-fn");
+  DefSym(InvalidArgs,           "invalid-args");
+  DefSym(ExpectInteger,         "expect-integer");
+  DefSym(ZeroDivision,          "zero-division");
+  DefSym(FileNotFound,          "file-not-found");
+  DefSym(InvalidPreEvalProc,    "invalid-pre-eval-proc");
+  DefSym(InvalidFileDescriptor, "invalid-file-descriptor");
+  DefSym(NotAProc,              "not-a-proc");
+  DefSym(OutOfRange,            "out-of-range");
+  DefSym(UnknownError,          "unknown-error");
+}
+
+#define DefPrim(index, name) {                                   \
+    DefSym(Prim##index, "%prim:" name);                          \
+    Sym(Prim##index)->Symbol.prim = le_int2obj(SymPrim##index);  \
+  }
+
+static void setupPrimitives(LeVM* vm) {
+ /* Arithmetics */
+  DefPrim(Add,               "add");
+  DefPrim(Sub,               "sub");
+  DefPrim(Mul,               "mul");
+  DefPrim(Div,               "div");
+  DefPrim(Mod,               "mod");
+  /* Compare */
+  DefPrim(Eq,                "eq");
+  DefPrim(Not,               "not");
+  DefPrim(Gt,                "gt");
+  /* Types */
+  DefPrim(TypeOf,            "type-of");
+  DefPrim(Hash,              "hash");
+  /* Array */
+  DefPrim(ArrayNew,          "array-new");
+  DefPrim(ArrayGet,          "array-get");
+  DefPrim(ArraySet,          "array-set!");
+  DefPrim(ArrayLen,          "array-len");
+  /* Pair */
+  DefPrim(Cons,              "cons");
+  DefPrim(Car,               "car");
+  DefPrim(Cdr,               "cdr");
+  DefPrim(SetCar,            "set-car!");
+  DefPrim(SetCdr,            "set-cdr!");
+  /* Symbol */
+  DefPrim(SymNew,            "sym-new");
+  DefPrim(SymStr,            "sym-str");
+  /* String */
+  DefPrim(Str,               "str");
+  DefPrim(StrLen,            "str-len");
+  DefPrim(StrGet,            "str-get");
+  DefPrim(StrEq,             "str-eq");
+  DefPrim(StrCat,            "str-cat");
+  DefPrim(StrMake,           "str-make");
+  /* Bytes */
+  DefPrim(BytesNew,          "bytes-new");
+  DefPrim(BytesGet,          "bytes-get");
+  DefPrim(BytesSet,          "bytes-set!");
+  DefPrim(BytesLen,          "bytes-len");
+  /* Error */
+  DefPrim(Raise,             "raise");
+  /* Read */
+  DefPrim(ReadStr,           "read-str");
+  /* I/O */
+  DefPrim(Putc,              "putc");
+  DefPrim(Getc,              "getc");
+  DefPrim(Print,             "print");
+  DefPrim(ReadTextFile,      "read-text-file");
+  DefPrim(WriteTextFile,     "write-text-file");
+  /* System */
+  DefPrim(Exit,              "exit");
+  DefPrim(GC,                "gc");
+  DefPrim(LoadFile,          "load-file");  
+}
+
+#define SetAsIs(symname) (setGlobal(vm, Sym(symname), Sym(symname)))
+
+static void setupVariables(LeVM* vm) {
+  setGlobal(vm, Sym(Nil), nil);
+  setGlobal(vm, Sym(PreEval), nil);
+  SetAsIs(True);
+  SetAsIs(Number);
+  SetAsIs(Array);
+  SetAsIs(Symbol);
+  SetAsIs(Pair);
+  SetAsIs(Func);
+  SetAsIs(Bytes);
+  SetAsIs(String);
+}
+
+static void setupVM(LeVM* vm) {
+  setupSymbols(vm);
+  setupPrimitives(vm);
+  setupVariables(vm);
 }
