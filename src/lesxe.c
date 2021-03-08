@@ -1390,19 +1390,18 @@ static int evalArgs(LeVM* vm, Obj args) {
   return Le_OK;
 }
 
-static int applyFunc(LeVM* vm, Obj func, Obj args) {
-  // func should be type checked
-  SaveStack;
-  Obj last;
-  
-  // swap env
-  Push(vm->env);
+
+static void buildFuncEnv(LeVM* vm, Obj func, Obj args) {
+  // vm->env should be restored by caller
+  // func and args should be evaled yet
+
+  // static env
   vm->env = func->Func.env;
   
-  // create env
-  Push(func);
+  // create apply env
   Obj vars = func->Func.vars;
   Obj env = nil;
+  
   while (vars != nil) {
     // rest
     if (le_is_symbol(vars)) {
@@ -1421,7 +1420,20 @@ static int applyFunc(LeVM* vm, Obj func, Obj args) {
     args = Cdr(Pop());
     vars = Cdr(Pop());
   }
+
+  // set
   vm->env = le_cons(vm, env, vm->env);
+}
+
+static int applyFunc(LeVM* vm, Obj func, Obj args) {
+  // func should be type checked
+  SaveStack;
+  Obj last;
+  
+  // swap env
+  Push(vm->env);
+  Push(func);
+  buildFuncEnv(vm, func, args);
   func = Pop();
 
   // apply
@@ -1533,16 +1545,6 @@ static int evalCatch(LeVM* vm, Obj xs) {
   Obj args = Cons(vm, err, nil);
   f = Pop();
 
-  return applyFunc(vm, f, args);
-}
-
-static int evalApply(LeVM* vm, Obj xs) {
-  // (apply F Args)
-  // F and Args should be evaled
-  Obj f    = Car(xs);
-  Obj args = Second(xs);
-  if (!le_is_func(f))
-    return RaiseWith(NotAProc, f);
   return applyFunc(vm, f, args);
 }
 
@@ -2145,14 +2147,14 @@ static int evalAux(LeVM* vm, Obj expr) {
     }
 
     // ----- Syntaxes having tail call
+
     if (first == Sym(If)) {
-      SaveStack;
       Obj cond = Car(rest);
       Obj then = Second(rest);
       Obj els  = Third(rest);
       Push(els);
       Push(then);
-      int code = eval(vm, cond);
+      code = eval(vm, cond);
       if (code != Le_OK) RestoreReturn(code);
       
       then = Pop(); // then
@@ -2164,49 +2166,55 @@ static int evalAux(LeVM* vm, Obj expr) {
     if (first == Sym(Let)) {
       // (let ((var val) ...) expr ...)
       // env: ( ((var . val) ...) ... )
-      SaveStack;
       Obj binds = Car(rest);
       Obj body = Cdr(rest);
       Push(body);
 
-      int code = buildLetEnv(vm, binds);
+      code = buildLetEnv(vm, binds);
       if (code != Le_OK) RestoreReturn(code);
   
       body = Pop();
       code = evalExprs(vm, body, &expr);
-      if (code != Le_OK) RestoreReturn(code);
+      ExpectOK;
 
       continue; // tail call!
     }
     
-    // eval args
+    // ----- Eval args
     Push(first);
     code = evalArgs(vm, rest);
     if (code != Le_OK) RestoreReturn(code);
     Obj args = vm->result;
     first = Pop();
 
-    // primitive
+    // ----- Primitive
     if (le_is_symbol(first) && first->Symbol.prim != nil) {
       int i = le_obj2int(first->Symbol.prim);
       PrimHandler f = PrimitiveTable[i];
       return f(vm, args);
     }
 
-    if (first == Sym(Apply))
-      return evalApply(vm, args);
+    // ----- Func Application
+    // last expr of func body should be tail called
+    Obj f;
 
-    // eval f
-    Push(args);
-    code = eval(vm, first);
-    ExpectOK;
-    Obj f = vm->result;
-    args = Pop();  
+    if (first == Sym(Apply)) {
+      // (apply f args)
+      f = Car(args);
+      args = Second(args);
+    } else {
+      // (f . args)
+      Push(args);
+      code = eval(vm, first);
+      ExpectOK;
+      f = vm->result;
+      args = Pop();
+    }
 
-    if (le_is_func(f)) return applyFunc(vm, f, args);
+    if (!le_is_func(f)) return RaiseWith(NotAProc, f);
 
-    return RaiseWith(NotAProc, f);
-
+    return applyFunc(vm, f, args);
+    
     break;
   }
   
