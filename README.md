@@ -4,7 +4,7 @@ For my learning purpose.
 
 - Interpreter
 - Copy GC
-- No tail call optimization
+- Tail call optimized
 
 ## THEME SONG
 
