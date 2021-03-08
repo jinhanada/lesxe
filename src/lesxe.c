@@ -57,6 +57,9 @@ enum {
       /* read */ SymPrimReadStr,
       /* error */ SymPrimRaise,
       /* system */ SymPrimExit, SymPrimGC, SymPrimLoadFile,
+      /* network */
+      SymPrimSocketMake, SymPrimSocketListen, SymPrimSocketAccept,
+      SymPrimSocketSend, SymPrimSocketClose,
       
       /* errors */
       SymError, SymUndefinedSymbol,
@@ -1083,6 +1086,15 @@ Public int le_raise_with(LeVM* vm, Obj error, Obj x) {
   return le_raise(vm, xs);
 }
 
+Public int le_raise_str(LeVM* vm, char* msg, Obj x) {
+  Obj xs = Cons(vm, x, nil);
+  Push(xs);
+  Obj str = le_new_str_from(vm, msg);
+  xs = Cons(vm, str, Pop());
+  xs = Cons(vm, Sym(Error), xs);
+  return le_raise(vm, xs);
+}
+
 
 // SXP Reader
 // =============================================================================
@@ -2027,6 +2039,109 @@ static int primLoadFile(LeVM* vm, Obj args) {
 }
 
 
+// ===== Network =====
+
+static int primSocketMake(LeVM* vm, Obj args) {
+  // (%prim:socket-make Port) => SockFD
+  Obj n = Car(args);
+  ExpectType(num, n);
+  int port = le_obj2int(n);
+
+  int sockfd;
+  struct sockaddr_in addr;
+  
+  // make a socket
+  sockfd = socket(AF_INET, SOCK_STREAM, 0);
+  if (sockfd < 0)
+    return le_raise_str(vm, "Can't make socket for port", n);
+
+  // socket config
+  addr.sin_family      = AF_INET;
+  addr.sin_port        = htons(port);
+  addr.sin_addr.s_addr = INADDR_ANY; // 0.0.0.0
+
+  //TODO pass option for SO_REUSEADDR what should be changed by env.dev
+  if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &(int){ 1 }, sizeof(int)) < 0)
+    return le_raise_str(vm, "Can't set socket option", nil);
+
+  // bind
+  int ret = bind(sockfd, (struct sockaddr*)&addr, sizeof(addr));
+  if (ret < 0)
+    return le_raise_str(vm, "Can't bind socket to 0.0.0.0, port", n);
+
+  vm->result = le_int2obj(sockfd);
+  return Le_OK;
+}
+
+static int primSocketListen(LeVM* vm, Obj args) {
+  // (%prim:socket-listen SockFD Limit) => SockFD
+  Obj sockfd = Car(args);
+  Obj limit = Second(args);
+  ExpectType(num, sockfd);
+  ExpectType(num, limit);
+  vm->result = sockfd;
+  
+  if (listen(le_obj2int(sockfd), le_obj2int(limit)) < 0)
+    return le_raise_str(vm, "Can't listen socket", sockfd);
+
+  return Le_OK;
+}
+
+static int primSocketSend(LeVM* vm, Obj args) {
+  // (%prim:socket-send SockFD String) => SockFD
+  Obj sockfd = Car(args);
+  Obj str = Second(args);
+  ExpectType(num, sockfd);
+  ExpectType(string, str);
+  vm->result = sockfd;
+  
+  char* out = le_cstr_of(str);
+  int   len = le_str_len(str);
+  send(le_obj2int(sockfd), out, len, 0);
+
+  return Le_OK;
+}
+
+static int primSocketAccept(LeVM* vm, Obj args) {
+  // (%prim:sock-accept SockFD Limit) => (wsock . String)
+  Obj sockfd_o = Car(args);
+  Obj limit_o = Second(args);
+  ExpectType(num, sockfd_o);
+  ExpectType(num, limit_o);
+
+  int sockfd = le_obj2int(sockfd_o);
+  
+  int wsock;
+  struct sockaddr_in client;
+  int  len = sizeof(client);
+  int  in_len = le_obj2int(limit_o);
+  char ibuf[in_len];
+  
+  // accept
+  wsock = accept(sockfd, (struct sockaddr*)&client, &len);
+  if (wsock < 0)
+    return le_raise_str(vm, "Accpet failed", nil);
+  
+  memset(ibuf, 0, sizeof(ibuf));
+  if (recv(wsock, ibuf, sizeof(ibuf), 0) < 0)
+    return le_raise_str(vm, "Receive failed", nil);
+
+  Obj received = le_new_str_from(vm, ibuf);
+  vm->result = Cons(vm, le_int2obj(wsock), received);
+
+  return Le_OK;
+}
+
+static int primSocketClose(LeVM* vm, Obj args) {
+  // (%prim:socket-close SockFD) => nil
+  Obj sockfd = Car(args);
+  ExpectType(num, sockfd);
+  int fd = le_obj2int(sockfd);
+  close(fd);
+  return Le_OK;
+}
+
+
 // ===== Eval =====
 
 static int evalSymbol(LeVM* vm, Obj sym) {
@@ -2446,7 +2561,13 @@ static void setupPrimitives(LeVM* vm) {
   /* System */
   DefPrim(Exit,              "exit");
   DefPrim(GC,                "gc");
-  DefPrim(LoadFile,          "load-file");  
+  DefPrim(LoadFile,          "load-file");
+  /* Network */
+  DefPrim(SocketMake,        "socket-make");
+  DefPrim(SocketListen,      "socket-listen");
+  DefPrim(SocketAccept,      "socket-accept");
+  DefPrim(SocketSend,        "socket-send");
+  DefPrim(SocketClose,       "socket-close");
 }
 
 #define SetAsIs(symname) (setGlobal(vm, Sym(symname), Sym(symname)))

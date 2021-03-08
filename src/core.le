@@ -266,6 +266,11 @@
 (def newline
      (fn () (putc c:newline)))
 
+(def c:space 32)
+
+(def space
+     (fn () (putc c:space)))
+
 (def io:print
      (fn (FD S) (%prim:print FD S)))
 
@@ -280,6 +285,12 @@
        (newline)
        X))
 
+(def prn
+     (fn Args
+       (list:each Args (fn (X) (prin1 X) (space)))
+       (newline)
+       (car Args)))
+
 (def file:read-text
      (fn (FName)
        (%prim:read-text-file FName)))
@@ -287,6 +298,15 @@
 (def file:write-text
      (fn (FName Str)
        (%prim:write-text-file FName Str)))
+
+
+;; Network
+;; =====================================
+(def sock:make   (fn (Port) (%prim:socket-make Port)))
+(def sock:listen (fn (SockFD Limit) (%prim:socket-listen SockFD Limit)))
+(def sock:send   (fn (SockFD Str) (%prim:socket-send SockFD Str)))
+(def sock:accept (fn (SockFD Limit) (%prim:socket-accept SockFD Limit)))
+(def sock:close  (fn (SockFD) (%prim:socket-close SockFD)))
 
 
 ;; Macro System

@@ -1,0 +1,38 @@
+(de (http:html-response Html)
+  (let ((Len (+ (str:len Html) 3)))
+    (str "HTTP/1.0 200 OK\r\n"
+         "Content-Length: " Len "\r\n"
+         "Content-Type: text/html\r\n"
+         "\r\n"
+         Html
+         "\r\n\r\n")))
+
+
+;; ===== Example Application =====
+
+(de (server:handle-hello Req)
+  (http:html-response "<h1>hello!</h1>"))
+
+(de (server:handle Req)
+  (server:handle-hello Req))
+
+
+;; ===== Entrypoint =====
+
+(de (server:run Port)
+  (let ((Sock (sock:make Port)))
+    (sock:listen Sock 32)
+    (prn "listen 0.0.0.0 on port" Port)
+    (loop rec ()
+      (let ((Result (sock:accept Sock 4096))
+            (WSock  (car Result))
+            (Data   (cdr Result))
+            (Req    Data)
+            (Res    (server:handle Req)))
+        (prn "received" Data)
+        (sock:send WSock Res)
+        (sock:close WSock)
+        (rec)))
+    (sock:close Sock)))
+
+(server:run 3010)
