@@ -1,4 +1,4 @@
-(de (http/method-sym S)
+(de (http:method-sym S)
   (cond
    ((str= S "GET")  'GET)
    ((str= S "POST") 'POST)
@@ -19,7 +19,7 @@
               (ReqLine (car Header))
               (Fields  (cdr Header))
               (ReqLine (str:split ReqLine " "))
-              (ReqLine (list (http/method-sym (car ReqLine))
+              (ReqLine (list (http:method-sym (car ReqLine))
                              (second ReqLine)
                              (third  ReqLine)))
               (Fields (loop rec ((Xs Fields) (Acc))
