@@ -61,7 +61,9 @@
 (def set-car! (fn (Xs V) (%prim:set-car! Xs V)))
 (def set-cdr! (fn (Xs V) (%prim:set-cdr! Xs V)))
 
+(def caar (fn (Xs) (car (car Xs))))
 (def cadr (fn (Xs) (car (cdr Xs))))
+(def cdar (fn (Xs) (cdr (car Xs))))
 (def cddr (fn (Xs) (cdr (cdr Xs))))
 
 (def second (fn (Xs) (car (cdr Xs))))
@@ -206,25 +208,21 @@
 ;; =====================================
 
 (def strfy (fn (S) (%prim:str S)))
-
+(def str= (fn (A B) (%prim:str-eq A B)))
 (def str:get (fn (S I) (%prim:str-get S I)))
-
 (def str:len (fn (S) (%prim:str-len S)))
-
+(def str:cat (fn (Xs) (%prim:str-cat Xs)))
+(def str:sub (fn (S Start End) (%prim:str-sub S Start End)))
+(def str:index (fn (S What) (%prim:str-index S What)))
 (def str:make
      ;; ArrayOfChars -> String
      (fn (Xs) (%prim:str-make Xs)))
-
-(def str:cat
-     (fn (Xs) (%prim:str-cat Xs)))
 
 (def str
      (fn Args
        (%prim:str-cat
         (list:map Args (fn (X) (if (string? X) X (strfy X)))))))
 
-(def str=
-     (fn (A B) (%prim:str-eq A B)))
 
 
 ;; Bytes
@@ -266,6 +264,11 @@
 (def newline
      (fn () (putc c:newline)))
 
+(def c:space 32)
+
+(def space
+     (fn () (putc c:space)))
+
 (def io:print
      (fn (FD S) (%prim:print FD S)))
 
@@ -280,6 +283,12 @@
        (newline)
        X))
 
+(def prn
+     (fn Args
+       (list:each Args (fn (X) (prin1 X) (space)))
+       (newline)
+       (car Args)))
+
 (def file:read-text
      (fn (FName)
        (%prim:read-text-file FName)))
@@ -287,6 +296,15 @@
 (def file:write-text
      (fn (FName Str)
        (%prim:write-text-file FName Str)))
+
+
+;; Network
+;; =====================================
+(def sock:make   (fn (Port) (%prim:socket-make Port)))
+(def sock:listen (fn (SockFD Limit) (%prim:socket-listen SockFD Limit)))
+(def sock:send   (fn (SockFD Str) (%prim:socket-send SockFD Str)))
+(def sock:accept (fn (SockFD Limit) (%prim:socket-accept SockFD Limit)))
+(def sock:close  (fn (SockFD) (%prim:socket-close SockFD)))
 
 
 ;; Macro System
@@ -644,6 +662,34 @@
         (array:set! Xs I (str:get S I))
         (rec (inc I))))
     Xs))
+
+(de (str:split1 Src What)
+  ;; nil | (Former . Latter)
+  (let ((SLen (str:len Src))
+        (WLen (str:len What))
+        (I    (str:index Src What)))
+    (if (nil? I) nil
+        (cons (str:sub Src 0 I)
+              (let ((Next (+ I WLen)))
+                (if (>= Next SLen)
+                    ""
+                    (str:sub Src Next SLen)))))))
+
+(de (str:split Src What)
+  ;; (List Of Splitted Strings)
+  (loop rec ((Acc nil) (Src Src))
+    (let ((S (str:split1 Src What)))
+      (if S
+          (rec (cons (car S) Acc)
+               (cdr S))
+          (list:reverse! (cons Src Acc))))))
+
+(de (str:join Xs What)
+  ;; (List Of String) => "ListWhatOfWhatString"
+  (loop rec ((X (car Xs)) (Xs (cdr Xs)))
+    (if Xs
+      (str X What (rec (car Xs) (cdr Xs)))
+      (str X))))
 
 
 ;; record-case

@@ -1,0 +1,148 @@
+(de (http/method-sym S)
+  (cond
+   ((str= S "GET")  'GET)
+   ((str= S "POST") 'POST)
+   (else S)))
+
+(de (http:req-method Req) (car (car Req)))
+(de (http:req-path   Req) (second (car Req)))
+(de (http:req-fields Req) (second Req))
+(de (http:req-body   Req) (third  Req))
+
+(de (http:parse-request Req)
+  ;; => ((Method Path Version) Fields Body)
+  (let ((Xs (str:split1 Req "\r\n\r\n")))
+    (if (nil? Xs) nil
+        (let ((Header  (car Xs))
+              (Body    (cdr Xs))
+              (Header  (str:split Header "\r\n"))
+              (ReqLine (car Header))
+              (Fields  (cdr Header))
+              (ReqLine (str:split ReqLine " "))
+              (ReqLine (list (http/method-sym (car ReqLine))
+                             (second ReqLine)
+                             (third  ReqLine)))
+              (Fields (loop rec ((Xs Fields) (Acc))
+                        (if Xs
+                            (rec (cdr Xs) (cons (str:split1 (car Xs) ": ") Acc))
+                            (list:reverse! Acc)))))
+          (list ReqLine Fields Body)))))
+
+(de (http:html-response Html)
+  (let ((Len (+ (str:len Html) 3)))
+    (str "HTTP/1.0 200 OK\r\n"
+         "Content-Length: " Len "\r\n"
+         "Content-Type: text/html\r\n"
+         "\r\n"
+         Html
+         "\r\n\r\n")))
+
+
+;; ===== Example Application =====
+
+(def app:message "hello")
+(def app:dev? true)
+
+(de (app:dev:reqs Req)
+  (str
+   "<p>" (http:req-path Req) "</p>"
+   "<p> Message: " app:message "</p>"
+   "<h2>request</h2>"
+   "<pre>" (car Req) "</pre>"
+   "<h2>fields</h2>"
+   "<pre>" (str:join (second Req) "\n") "</pre>"
+   "<h2>body</h2>"
+   "<pre>" (third Req) "</pre>"
+   "<form action=\"/set-message\" method=\"POST\"><div><textarea name=\"message\" row=10 col=40>"
+   app:message
+   "</textarea></div><div><input type=\"submit\">Send</input></div></form>"
+   ))
+
+(de (app:res Res Req)
+  (if app:dev?
+    (http:html-response (str Res (app:dev:reqs Req)))
+    (http:html-response Res)))
+
+(de (title S)
+  (str "<h1>" S "</h1>"))
+
+(def menu
+     (str
+      "<p>"
+      (str:join
+       (list:map
+        '(("/"            "root")
+          ("/hello"       "hello")
+          ("/hello/world" "hello-world"))
+        (fn (X) (str "<a href=\"" (car X) "\">" (second X) "</a>")))
+       " | ")
+      "</p>"))
+
+(de (handle-hello Req)
+  (prn "handle: hello")
+  (-> (str (title "Hello!")
+           menu)
+      (app:res Req)))
+
+(de (handle-hello-world Req)
+  (prn "handle: hello-world")
+  (-> (str (title "Hello World!")
+           menu)
+      (app:res Req)))
+
+(de (handle-root Req)
+  (prn "handle: root")
+  (-> (str (title "Welcome")
+           menu)
+      (app:res Req)))
+
+(de (handle-set-message Req)
+  (prn "handle: set-message")
+  (set! app:message (cdr (str:split1 (http:req-body Req) "=")))
+  (-> (str (title "Done.")
+           menu)
+      (app:res Req)))
+
+(de (handle-404 Req)
+  (-> (str (title "404 Not Found"))
+      (app:res Req)))
+
+(def app:handlers
+  (list
+   (cons "/hello"       handle-hello)
+   (cons "/hello/world" handle-hello-world)
+   (cons "/set-message" handle-set-message)
+   (cons "/"            handle-root)))
+
+(de (app:handle Req)
+  (let ((Path (http:req-path Req)))
+    (loop next ((Xs app:handlers))
+      (cond
+       ((nil? Xs) (handle-404 Req))
+       ((str= Path (caar Xs)) ((cdar Xs) Req))
+       (else (next (cdr Xs)))))))
+
+
+;; ===== Entrypoint =====
+
+(de (app:run Port)
+  (let ((Sock (sock:make Port)))
+    (sock:listen Sock 32)
+    (prn "listen 0.0.0.0 on port" Port)
+    (loop rec ()
+      (prn "===== listen =====")
+      (let ((Result (sock:accept Sock (* 4096 16)))
+            (_      (print "===== accept ====="))
+            (WSock  (car Result))
+            (Data   (cdr Result))
+            (Req    (http:parse-request Data))
+            (Res    (app:handle Req)))
+        (prn "received" Data)
+        (prn "request" Req)
+        (sock:send WSock Res)
+        (sock:close WSock)
+        (prn "===== wsock closed =====")
+        (rec)))
+    (sock:close Sock)))
+
+(app:run 3000)

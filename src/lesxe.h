@@ -8,6 +8,12 @@
 #include <stdint.h>
 #include <assert.h>
 
+// network
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+
 
 // Types & Structs
 // =============================================================================
@@ -103,6 +109,7 @@ void  le_free_vm(LeVM* vm);
 // =============================================================================
 int le_raise(LeVM* vm, LeObj* err);
 int le_raise_with(LeVM* vm, LeObj* error, LeObj* x);
+int le_raise_str(LeVM* vm, char* msg, LeObj* x);
 
 
 // S Expression Reader
