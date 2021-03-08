@@ -48,7 +48,7 @@ enum {
       /* symbol */ SymPrimSymNew, SymPrimSymStr,
       /* string */
       SymPrimStr, SymPrimStrLen, SymPrimStrGet, SymPrimStrEq, SymPrimStrCat,
-      SymPrimStrMake,
+      SymPrimStrMake, SymPrimStrSub, SymPrimStrIndex,
       /* bytes */
       SymPrimBytesNew, SymPrimBytesGet, SymPrimBytesSet, SymPrimBytesLen,
       /* i/o */
@@ -1864,6 +1864,66 @@ static int primStrMake(LeVM* vm, Obj args) {
   return Le_OK;
 }
 
+static int primStrSub(LeVM* vm, Obj args) {
+  // (%prim:str-sub Str Start End) => SubStr
+  Obj s = Car(args);
+  Obj n_start = Second(args);
+  Obj n_end = Third(args);
+  ExpectType(string, s);
+  ExpectType(num, n_start);
+  ExpectType(num, n_end);
+
+  // calculate
+  int start = le_obj2int(n_start);
+  int end   = le_obj2int(n_end);
+  char* src = le_cstr_of(s);
+  int   len = strlen(src);
+  if (start < 0) start = len + start;
+  if (end   < 0) end   = len + end + 1;
+  if (end < start || start < 0 || end < 0 || len <= start || len < end)
+    return le_raise_with(vm, Sym(OutOfRange), Cons(vm, n_start, n_end));
+  len = end - start;
+
+  // copy
+  Push(s);
+  Obj sub = le_new_str(vm, len);
+  s = Pop();
+  memcpy(le_cstr_of(sub), le_cstr_of(s) + start, len);
+  le_cstr_of(sub)[len] = '\0';
+  
+  vm->result = sub;
+  return Le_OK;
+}
+
+static int primStrIndex(LeVM* vm, Obj args) {
+  // (%prim:str-index Str What) => Pos | nil
+  Obj src = Car(args);
+  Obj what = Second(args);
+  ExpectType(string, src);
+  ExpectType(string, what);
+  
+  int wlen = le_str_len(what);
+  int max  = le_str_len(src) - wlen + 1;  // abc:bc => 3 - 2 + 1 = 0..2
+  char* s = le_cstr_of(src);
+  char* w = le_cstr_of(what);
+  
+  for (int i = 0; i < max; i++) {
+    if (s[i] != *w) continue;
+    // match first
+    for (int j = 0; ; j++) {
+      // match all
+      if (w[j] == '\0') {
+        vm->result = le_int2obj(i);
+        return Le_OK;
+      }
+      if (w[j] != s[i+j]) break;
+    }
+  }
+  
+  vm->result = nil;
+  return Le_OK;  
+}
+
 
 // ===== Bytes =====
 
@@ -2543,6 +2603,8 @@ static void setupPrimitives(LeVM* vm) {
   DefPrim(StrEq,             "str-eq");
   DefPrim(StrCat,            "str-cat");
   DefPrim(StrMake,           "str-make");
+  DefPrim(StrSub,            "str-sub");
+  DefPrim(StrIndex,          "str-index");
   /* Bytes */
   DefPrim(BytesNew,          "bytes-new");
   DefPrim(BytesGet,          "bytes-get");
