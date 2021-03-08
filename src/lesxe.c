@@ -1580,11 +1580,6 @@ static int evalCatch(LeVM* vm, Obj xs) {
   return applyFunc(vm, f, args);
 }
 
-static int evalQuote(LeVM* vm, Obj xs) {
-  vm->result = xs;
-  return Le_OK;
-}
-
 static int evalApply(LeVM* vm, Obj xs) {
   // (apply F Args)
   // F and Args should be evaled
@@ -2151,18 +2146,24 @@ static int eval(LeVM* vm, Obj expr) {
     Obj rest  = Cdr(expr);
     int code;
 
-    // Syntax
-    if (first == Sym(Let))      return evalLet(vm, rest);
+    // Syntaxes not having tail call
     if (first == Sym(Fn))       return evalFn(vm, rest);
     if (first == Sym(Def))      return evalDef(vm, rest);
-    if (first == Sym(If))       return evalIf(vm, rest);
     if (first == Sym(Set))      return evalSet(vm, rest);
     if (first == Sym(While))    return evalWhile(vm, rest);
     if (first == Sym(Break))    return Le_Break;
     if (first == Sym(Continue)) return Le_Continue;
     if (first == Sym(Catch))    return evalCatch(vm, rest);
-    if (first == Sym(Quote))    return evalQuote(vm, rest);
+    
+    if (first == Sym(Quote)) {
+      vm->result = rest;
+      return Le_OK;
+    }
 
+    // Syntaxes having tail call
+    if (first == Sym(If))       return evalIf(vm, rest);
+    if (first == Sym(Let)) return evalLet(vm, rest);
+    
     // eval args
     Push(first);
     code = evalArgs(vm, rest);
