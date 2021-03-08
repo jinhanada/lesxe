@@ -1329,64 +1329,27 @@ static int findLocal(LeVM* vm, Obj env, Obj sym) {
 
 // ===== Syntax =====
 
-static int evalExprs(LeVM* vm, Obj xs) {
+static int evalExprs(LeVM* vm, Obj xs, Obj* last) {
+  // For tail call optimization, last expression won't be
+  // evaled and set to &last
   SaveStack;
   // exprs should be a pair or nil
   int code = Le_OK;
-
   vm->result = nil;
-  while (xs != nil) {
+  *last = nil;
+  if (xs == nil) return Le_OK; // no expression
+
+  while (Cdr(xs) != nil) {
     Obj expr = Car(xs);
     Push(Cdr(xs));
-    code = eval(vm, expr); // vm->result holds last result
+    code = eval(vm, expr);
     if (code != Le_OK) RestoreReturn(code);
 
     xs = Pop();
   }
   
-  // again, vm->result holds last result
+  *last = Car(xs); // last expression
   return Le_OK;
-}
-
-static int evalLet(LeVM* vm, Obj rest) {
-  // (let ((var val) ...) expr ...)
-  // env: ( ((var . val) ...) ... )
-  SaveStack;
-  int env_i = Push(vm->env);
-  Obj binds = Car(rest);
-  Obj body = Cdr(rest);
-  Push(body);
-  int code = Le_OK;
-
-  vm->env = le_cons(vm, nil, vm->env);
-  while (binds) {
-    Push(binds);
-    Obj bind = Car(binds);
-    Obj var = Car(bind);
-    Obj val = Second(bind);
-    Push(var);
-    code = eval(vm, val);
-    if (code != Le_OK) {
-      vm->env = le_stack_at(vm, env_i);
-      RestoreReturn(code);
-    }
-
-    val = vm->result;
-    var = Pop();
-    // create bind var/val on env, as dotted pair
-    bind = le_cons(vm, var, val);
-    Obj env = le_cons(vm, bind, Car(vm->env));
-    SetCar(vm->env, env);
-    // next
-    binds = Cdr(Pop());
-  }
-  
-  body = Pop();
-  code = evalExprs(vm, body);
-  // result or err is set on vm
-  vm->env = Pop();
-  
-  return code;
 }
 
 static int evalFn(LeVM* vm, Obj rest) {
@@ -1429,7 +1392,9 @@ static int evalArgs(LeVM* vm, Obj args) {
 
 static int applyFunc(LeVM* vm, Obj func, Obj args) {
   // func should be type checked
-
+  SaveStack;
+  Obj last;
+  
   // swap env
   Push(vm->env);
   vm->env = func->Func.env;
@@ -1460,7 +1425,9 @@ static int applyFunc(LeVM* vm, Obj func, Obj args) {
   func = Pop();
 
   // apply
-  int code = evalExprs(vm, func->Func.code);
+  int code = evalExprs(vm, func->Func.code, &last);
+  if (code != Le_OK) RestoreReturn(code);
+  code = eval(vm, last);
   // result or err is set on vm
   
   // restore env
@@ -1516,6 +1483,7 @@ static int evalSet(LeVM* vm, Obj xs) {
 
 static int evalWhile(LeVM* vm, Obj xs) {
   SaveStack;
+  Obj last;
   Obj cond = Car(xs);
   Obj body = Cdr(xs);
  
@@ -1524,10 +1492,14 @@ static int evalWhile(LeVM* vm, Obj xs) {
   int code = eval(vm, cond);
   while (code == Le_OK && vm->result != nil) {
     body = le_stack_at(vm, body_i);
-    code = evalExprs(vm, body);
+    code = evalExprs(vm, body, &last);
     if (code == Le_Continue) code = Le_OK;
     if (code == Le_Break)    break;
     if (code != Le_OK) RestoreReturn(code);
+    code = eval(vm, last);
+    if (code == Le_Continue) code = Le_OK;
+    if (code == Le_Break)    break;
+    if (code != Le_OK) RestoreReturn(code);    
     cond = le_stack_at(vm, cond_i);
     code = eval(vm, cond);
   }
@@ -2111,7 +2083,35 @@ static int evalSymbol(LeVM* vm, Obj sym) {
 }
 
 
-static int eval(LeVM* vm, Obj expr) {
+static int buildLetEnv(LeVM* vm, Obj binds) {
+  // inplace!
+  // Restoreing vm->env is guaranteed by eval()
+  SaveStack;
+  vm->env = le_cons(vm, nil, vm->env);
+
+  int code = Le_OK;
+  while (binds) {
+    Push(binds);
+    Obj bind = Car(binds);
+    Obj var = Car(bind);
+    Obj val = Second(bind);
+    Push(var);
+    code = eval(vm, val);
+    if (code != Le_OK) RestoreReturn(code);
+    
+    val = vm->result;
+    var = Pop();
+    // create bind var/val on env, as dotted pair
+    bind = le_cons(vm, var, val);
+    Obj env = le_cons(vm, bind, Car(vm->env));
+    SetCar(vm->env, env);
+    // next
+    binds = Cdr(Pop());
+  }
+  return code;
+}
+
+static int evalAux(LeVM* vm, Obj expr) {
   while (1) {
     if (expr == nil || le_is_num(expr) || le_is_string(expr)) {
       vm->result = expr;
@@ -2161,7 +2161,23 @@ static int eval(LeVM* vm, Obj expr) {
       continue; // tail call!
     }
     
-    if (first == Sym(Let)) return evalLet(vm, rest);
+    if (first == Sym(Let)) {
+      // (let ((var val) ...) expr ...)
+      // env: ( ((var . val) ...) ... )
+      SaveStack;
+      Obj binds = Car(rest);
+      Obj body = Cdr(rest);
+      Push(body);
+
+      int code = buildLetEnv(vm, binds);
+      if (code != Le_OK) RestoreReturn(code);
+  
+      body = Pop();
+      code = evalExprs(vm, body, &expr);
+      if (code != Le_OK) RestoreReturn(code);
+
+      continue; // tail call!
+    }
     
     // eval args
     Push(first);
@@ -2170,15 +2186,15 @@ static int eval(LeVM* vm, Obj expr) {
     Obj args = vm->result;
     first = Pop();
 
-    if (first == Sym(Apply))
-      return evalApply(vm, args);
-
     // primitive
     if (le_is_symbol(first) && first->Symbol.prim != nil) {
       int i = le_obj2int(first->Symbol.prim);
       PrimHandler f = PrimitiveTable[i];
       return f(vm, args);
     }
+
+    if (first == Sym(Apply))
+      return evalApply(vm, args);
 
     // eval f
     Push(args);
@@ -2193,7 +2209,15 @@ static int eval(LeVM* vm, Obj expr) {
 
     break;
   }
+  
   DIE("How do you reach here!?");
+}
+
+static int eval(LeVM* vm, Obj expr) {
+  Push(vm->env);
+  int code = evalAux(vm, expr);
+  vm->env = Pop();
+  return code;
 }
 
 
