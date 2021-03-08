@@ -2111,12 +2111,43 @@ static int primLoadFile(LeVM* vm, Obj args) {
 }
 
 
-// ===== Pair =====
+// ===== Eval =====
 
-static int evalPair(LeVM* vm, Obj xs) {
+static int evalSymbol(LeVM* vm, Obj sym) {
+  // binds: ( ((var . val) ...) ... )
+  Obj env = vm->env;
+
+  // local
+  int code = findLocal(vm, env, sym);
+  if (code == Le_OK) return Le_OK;
+
+  // global
+  Obj ref = findGlobalRef(vm, sym);
+  if (ref != nil) {
+    vm->result = Car(ref);
+    return Le_OK;
+  }
+
+  return RaiseWith(UndefinedSymbol, sym);
+}
+
+
+static int eval(LeVM* vm, Obj expr) {
+  if (expr == nil || le_is_num(expr) || le_is_string(expr)) {
+    vm->result = expr;
+    return Le_OK;
+  }
+
+  if (le_is_symbol(expr)) {
+    return evalSymbol(vm, expr);
+  }
+
+  if (!le_is_pair(expr))
+    DIE("Can't eval %s", toStr(expr));
+  
   SaveStack;
-  Obj first = Car(xs);
-  Obj rest  = Cdr(xs);
+  Obj first = Car(expr);
+  Obj rest  = Cdr(expr);
   int code;
 
   // Syntax
@@ -2158,47 +2189,7 @@ static int evalPair(LeVM* vm, Obj xs) {
   if (le_is_func(f)) return applyFunc(vm, f, args);
 
   return RaiseWith(NotAProc, f);
-}
-
-
-// ===== Symbol =====
-
-static int evalSymbol(LeVM* vm, Obj sym) {
-  // binds: ( ((var . val) ...) ... )
-  Obj env = vm->env;
-
-  // local
-  int code = findLocal(vm, env, sym);
-  if (code == Le_OK) return Le_OK;
-
-  // global
-  Obj ref = findGlobalRef(vm, sym);
-  if (ref != nil) {
-    vm->result = Car(ref);
-    return Le_OK;
-  }
-
-  return RaiseWith(UndefinedSymbol, sym);
-}
-
-
-// ===== Eval =====
-
-static int eval(LeVM* vm, Obj expr) {
-  if (expr == nil || le_is_num(expr) || le_is_string(expr)) {
-    vm->result = expr;
-    return Le_OK;
-  }
-
-  if (le_is_pair(expr)) {
-    return evalPair(vm, expr);
-  }
-
-  if (le_is_symbol(expr)) {
-    return evalSymbol(vm, expr);
-  }
-
-  DIE("Unimplemented eval for %s", toStr(expr));
+  
 }
 
 
