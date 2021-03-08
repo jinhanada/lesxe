@@ -1483,22 +1483,6 @@ static int evalDef(LeVM* vm, Obj xs) {
   return Le_OK;
 }
 
-static int evalIf(LeVM* vm, Obj xs) {
-  SaveStack;
-  Obj cond = Car(xs);
-  Obj then = Second(xs);
-  Obj els  = Third(xs);
-  Push(els);
-  Push(then);
-  int code = eval(vm, cond);
-  if (code != Le_OK) RestoreReturn(code);
-
-  then = Pop(); // then
-  els  = Pop();
-  Obj expr = vm->result != nil ? then : els;
-  return eval(vm, expr);
-}
-
 static int evalSet(LeVM* vm, Obj xs) {
   SaveStack;
   Obj var = Car(xs);
@@ -2134,9 +2118,8 @@ static int eval(LeVM* vm, Obj expr) {
       return Le_OK;
     }
 
-    if (le_is_symbol(expr)) {
+    if (le_is_symbol(expr))
       return evalSymbol(vm, expr);
-    }
 
     if (!le_is_pair(expr))
       DIE("Can't eval %s", toStr(expr));
@@ -2146,7 +2129,8 @@ static int eval(LeVM* vm, Obj expr) {
     Obj rest  = Cdr(expr);
     int code;
 
-    // Syntaxes not having tail call
+    // ----- Syntaxes not having tail call
+    
     if (first == Sym(Fn))       return evalFn(vm, rest);
     if (first == Sym(Def))      return evalDef(vm, rest);
     if (first == Sym(Set))      return evalSet(vm, rest);
@@ -2160,8 +2144,23 @@ static int eval(LeVM* vm, Obj expr) {
       return Le_OK;
     }
 
-    // Syntaxes having tail call
-    if (first == Sym(If))       return evalIf(vm, rest);
+    // ----- Syntaxes having tail call
+    if (first == Sym(If)) {
+      SaveStack;
+      Obj cond = Car(rest);
+      Obj then = Second(rest);
+      Obj els  = Third(rest);
+      Push(els);
+      Push(then);
+      int code = eval(vm, cond);
+      if (code != Le_OK) RestoreReturn(code);
+      
+      then = Pop(); // then
+      els  = Pop();
+      expr = vm->result != nil ? then : els;
+      continue; // tail call!
+    }
+    
     if (first == Sym(Let)) return evalLet(vm, rest);
     
     // eval args
