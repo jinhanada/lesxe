@@ -1,10 +1,12 @@
 (def list (fn Xs Xs))
+(def else true)
 
 (def +   (fn (A B) (%prim:add A B)))
 (def -   (fn (A B) (%prim:sub A B)))
 (def *   (fn (A B) (%prim:mul A B)))
 (def /   (fn (A B) (%prim:div A B)))
 (def mod (fn (A B) (%prim:mod A B)))
+(def inc (fn (N)   (%prim:add N 1)))
 
 (def =   (fn (A B) (%prim:eq A B)))
 (def not (fn (X)   (%prim:not X)))
@@ -511,6 +513,16 @@
     `(def ,Name ,(cons 'fn (cons Args Body)))))
 
 
+(demac (cond Clause . Clauses)
+  (letrec
+      ((Rec (fn (Clause Clauses)
+            (let ((Cond (car Clause))
+                  (Body (cdr Clause))
+                  (Rest (if Clauses (Rec (car Clauses) (cdr Clauses)) nil)))
+              `(if ,Cond (let () ,@Body) ,Rest)))))
+    (Rec Clause Clauses)))
+
+
 ;; Gensym
 ;; =====================================
 (def sym:GENSYM-COUNTER
@@ -650,3 +662,20 @@
              (,Sign (car ,Xs))
              (,Vals (cdr ,Xs)))
          ,(Expand Clauses)))))
+
+
+;; Threading macros
+;; =====================================
+(demac (-> Arg F . Rest)
+  (letrec
+      ((Rec
+        (fn (Arg F Rest)
+          (let ((Wrapped
+                 (cond
+                  ((symbol? F) (list F Arg))
+                  ((pair? F)   `(,(car F) ,Arg ,@(cdr F)))
+                  (else        (raise `(in -> ,F should be symbol or pair))))))
+            (if Rest
+              (Rec Wrapped (car Rest) (cdr Rest))
+              Wrapped)))))
+    (Rec Arg F Rest)))
