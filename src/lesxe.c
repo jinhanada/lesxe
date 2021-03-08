@@ -2133,63 +2133,67 @@ static int evalSymbol(LeVM* vm, Obj sym) {
 
 
 static int eval(LeVM* vm, Obj expr) {
-  if (expr == nil || le_is_num(expr) || le_is_string(expr)) {
-    vm->result = expr;
-    return Le_OK;
-  }
+  while (1) {
+    if (expr == nil || le_is_num(expr) || le_is_string(expr)) {
+      vm->result = expr;
+      return Le_OK;
+    }
 
-  if (le_is_symbol(expr)) {
-    return evalSymbol(vm, expr);
-  }
+    if (le_is_symbol(expr)) {
+      return evalSymbol(vm, expr);
+    }
 
-  if (!le_is_pair(expr))
-    DIE("Can't eval %s", toStr(expr));
+    if (!le_is_pair(expr))
+      DIE("Can't eval %s", toStr(expr));
   
-  SaveStack;
-  Obj first = Car(expr);
-  Obj rest  = Cdr(expr);
-  int code;
+    SaveStack;
+    Obj first = Car(expr);
+    Obj rest  = Cdr(expr);
+    int code;
 
-  // Syntax
-  if (first == Sym(Let))      return evalLet(vm, rest);
-  if (first == Sym(Fn))       return evalFn(vm, rest);
-  if (first == Sym(Def))      return evalDef(vm, rest);
-  if (first == Sym(If))       return evalIf(vm, rest);
-  if (first == Sym(Set))      return evalSet(vm, rest);
-  if (first == Sym(While))    return evalWhile(vm, rest);
-  if (first == Sym(Break))    return Le_Break;
-  if (first == Sym(Continue)) return Le_Continue;
-  if (first == Sym(Catch))    return evalCatch(vm, rest);
-  if (first == Sym(Quote))    return evalQuote(vm, rest);
+    // Syntax
+    if (first == Sym(Let))      return evalLet(vm, rest);
+    if (first == Sym(Fn))       return evalFn(vm, rest);
+    if (first == Sym(Def))      return evalDef(vm, rest);
+    if (first == Sym(If))       return evalIf(vm, rest);
+    if (first == Sym(Set))      return evalSet(vm, rest);
+    if (first == Sym(While))    return evalWhile(vm, rest);
+    if (first == Sym(Break))    return Le_Break;
+    if (first == Sym(Continue)) return Le_Continue;
+    if (first == Sym(Catch))    return evalCatch(vm, rest);
+    if (first == Sym(Quote))    return evalQuote(vm, rest);
 
-  // eval args
-  Push(first);
-  code = evalArgs(vm, rest);
-  if (code != Le_OK) RestoreReturn(code);
-  Obj args = vm->result;
-  first = Pop();
+    // eval args
+    Push(first);
+    code = evalArgs(vm, rest);
+    if (code != Le_OK) RestoreReturn(code);
+    Obj args = vm->result;
+    first = Pop();
 
-  if (first == Sym(Apply))
-    return evalApply(vm, args);
+    if (first == Sym(Apply))
+      return evalApply(vm, args);
 
-  // primitive
-  if (le_is_symbol(first) && first->Symbol.prim != nil) {
-    int i = le_obj2int(first->Symbol.prim);
-    PrimHandler f = PrimitiveTable[i];
-    return f(vm, args);
+    // primitive
+    if (le_is_symbol(first) && first->Symbol.prim != nil) {
+      int i = le_obj2int(first->Symbol.prim);
+      PrimHandler f = PrimitiveTable[i];
+      return f(vm, args);
+    }
+
+    // eval f
+    Push(args);
+    code = eval(vm, first);
+    ExpectOK;
+    Obj f = vm->result;
+    args = Pop();  
+
+    if (le_is_func(f)) return applyFunc(vm, f, args);
+
+    return RaiseWith(NotAProc, f);
+
+    break;
   }
-
-  // eval f
-  Push(args);
-  code = eval(vm, first);
-  ExpectOK;
-  Obj f = vm->result;
-  args = Pop();  
-
-  if (le_is_func(f)) return applyFunc(vm, f, args);
-
-  return RaiseWith(NotAProc, f);
-  
+  DIE("How do you reach here!?");
 }
 
 
