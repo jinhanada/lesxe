@@ -33,7 +33,7 @@ enum {
       SymQuote, SymQuasiquote,
       SymUnquote, SymUnquoteSplicing,
       SymLet, SymFn, SymDef, SymIf, SymSet,
-      SymWhile, SymBreak, SymContinue,
+      SymContinue,
       SymApply, SymCatch, SymPreEval,
 
       /* types */
@@ -1493,33 +1493,6 @@ static int evalSet(LeVM* vm, Obj xs) {
   return RaiseWith(UndefinedSymbol, var);
 }
 
-static int evalWhile(LeVM* vm, Obj xs) {
-  SaveStack;
-  Obj last;
-  Obj cond = Car(xs);
-  Obj body = Cdr(xs);
- 
-  int cond_i = Push(cond);
-  int body_i = Push(body);
-  int code = eval(vm, cond);
-  while (code == Le_OK && vm->result != nil) {
-    body = le_stack_at(vm, body_i);
-    code = evalExprs(vm, body, &last);
-    if (code == Le_Continue) code = Le_OK;
-    if (code == Le_Break)    break;
-    if (code != Le_OK) RestoreReturn(code);
-    code = eval(vm, last);
-    if (code == Le_Continue) code = Le_OK;
-    if (code == Le_Break)    break;
-    if (code != Le_OK) RestoreReturn(code);    
-    cond = le_stack_at(vm, cond_i);
-    code = eval(vm, cond);
-  }
-
-  vm->result = nil;
-  RestoreReturn(Le_OK);
-}
-
 static int evalCatch(LeVM* vm, Obj xs) {
   // (catch expr fn)
   SaveStack;
@@ -2136,8 +2109,6 @@ static int evalAux(LeVM* vm, Obj expr) {
     if (first == Sym(Fn))       return evalFn(vm, rest);
     if (first == Sym(Def))      return evalDef(vm, rest);
     if (first == Sym(Set))      return evalSet(vm, rest);
-    if (first == Sym(While))    return evalWhile(vm, rest);
-    if (first == Sym(Break))    return Le_Break;
     if (first == Sym(Continue)) return Le_Continue;
     if (first == Sym(Catch))    return evalCatch(vm, rest);
     
@@ -2400,9 +2371,6 @@ static void setupSymbols(LeVM* vm) {
   DefSym(Def,                   "def");
   DefSym(If,                    "if");
   DefSym(Set,                   "set!");
-  DefSym(While,                 "while");
-  DefSym(Break,                 "break");
-  DefSym(Continue,              "continue");
   DefSym(Apply,                 "apply");
   DefSym(Catch,                 "catch");
   DefSym(PreEval,               "%pre-eval");
