@@ -137,11 +137,12 @@
             (Data   (cdr Result))
             (Req    (http:parse-request Data))
             (Res    (app:handle Req)))
-        (prn "received" Data)
-        (prn "request" Req)
+        (when app:dev?
+          (prn "request")
+          (list:each Req prn))
         (sock:send WSock Res)
         (sock:close WSock)
-        (prn "===== wsock closed =====")
+        (prn "===== wsock closed =====\n")
         (rec)))
     (sock:close Sock)))
 
