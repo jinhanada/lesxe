@@ -7,6 +7,7 @@
 (def /   (fn (A B) (%prim:div A B)))
 (def mod (fn (A B) (%prim:mod A B)))
 (def inc (fn (N)   (%prim:add N 1)))
+(def dec (fn (N)   (%prim:sub N 1)))
 
 (def =   (fn (A B) (%prim:eq A B)))
 (def not (fn (X)   (%prim:not X)))
@@ -69,10 +70,11 @@
 
 (def list:each
      (fn (Xs F)
-       (while Xs
-         (F (car Xs))
-         (set! Xs (cdr Xs)))
-       Xs))
+       (if Xs
+         (let ()
+           (F (car Xs))
+           (list:each (cdr Xs) F))
+         Xs)))
 
 (def list:len
      (fn (Xs)
@@ -100,24 +102,26 @@
 
 (def assoc:new
      (fn Args
-       (let ((Xs Args) (Acc nil))
-         (while Xs
-                (set! Acc (cons (cons (car Xs) (second Xs))
-                                Acc))
-                (set! Xs (cddr Xs)))
-         (cons assoc:sign Acc))))
+       (let ((rec nil))
+         (set! rec
+               (fn (Xs Acc)
+                 (if Xs
+                   (rec (cddr Xs)
+                        (cons (cons (car Xs) (second Xs)) Acc))
+                   (cons assoc:sign Acc))))
+         (rec Args nil))))
 
 (def assoc:ref
      (fn (Assoc Key)
-       (let ((Xs (cdr Assoc)) (R nil))
-         (while Xs
-                (let ((X (car Xs)))
-                  (if (= (car X) Key)
-                      (let ()
-                        (set! R X)
-                        (set! Xs nil))
-                      (set! Xs (cdr Xs)))))
-         R)))
+       (let ((rec nil))
+         (set! rec
+               (fn (Xs)
+                 (if Xs
+                   (let ((X (car Xs)))
+                     (if (= (car X) Key)
+                       X
+                       (rec (cdr Xs)))))))
+         (rec (cdr Assoc)))))
 
 (def assoc:get
      (fn (Assoc Key)
@@ -160,12 +164,16 @@
 
 (def dict:new
      (fn Args
-       (let ((Args Args)
+       (let ((rec nil)
              (Len dict:default-size)
              (Xs (array:new Len)))
-         (while Args
-                (dict:aux:set Xs (car Args) (second Args))
-                (set! Args (cddr Args)))
+         (set! rec
+               (fn (Args)
+                 (if Args
+                   (let ()
+                     (dict:aux:set Xs (car Args) (second Args))
+                     (rec (cdr Args))))))
+         (rec Args)
          (list dict:sign Xs))))
 
 (def dict:has?
@@ -321,25 +329,6 @@
 
 (dict:set!
  macro:SYNTAX-DICT
- 'while
- (fn (Counter Expr)
-   (let ((F    (macro:aux-rec Counter))
-         (Cond (F (car Expr)))
-         (Body (list:map (cdr Expr) F)))
-     (cons 'while (cons Cond Body)))))
-
-(dict:set!
- macro:SYNTAX-DICT
- 'break
- (fn (Counter _) (list 'break)))
-
-(dict:set!
- macro:SYNTAX-DICT
- 'continue
- (fn (Counter _) (list 'continue)))
-
-(dict:set!
- macro:SYNTAX-DICT
  'set!
  (fn (Counter Expr)
    (let ((F   (macro:aux-rec Counter))
@@ -426,13 +415,17 @@
 
 (def expand-macro
      (fn (Expr)
-       (let ((X Expr)
-             (Count 1)
-             (Counter (fn () (set! Count (+ Count 1)))))
-         (while (> Count 0)
-                (set! Count 0)
-                (set! X (expand-macro-1 Counter X)))
-         X)))
+       (let ((Count 1)
+             (Counter (fn () (set! Count (+ Count 1))))
+             (loop nil))
+         (set! loop
+               (fn (Expr)
+                 (if (> Count 0)
+                   (let ()
+                     (set! Count 0)
+                     (loop (expand-macro-1 Counter Expr)))
+                   Expr)))
+         (loop Expr))))
 
 (set! %pre-eval
       (fn (Expr)
@@ -507,6 +500,21 @@
     `(let ,Defs ,@Sets ,@Body)))
 
 
+(demac (loop Name Binds . Body)
+  ;; (loop Name ((Var Val) ...) . Body)
+  ;; => (letrec ((Name (fn (Var ...) . Body))) (Name Val ...))
+  (let ((Vars (list:map Binds car))
+        (Vals (list:map Binds second)))
+    `(letrec ((,Name (fn ,Vars ,@Body))) (,Name ,@Vals))))
+
+
+(demac (when Cond . Body)
+  `(if ,Cond (let () ,@Body)))
+
+(demac (unless Cond . Body)
+  `(if ,Cond nil (let () ,@Body)))
+
+
 (demac (de Def . Body)
   (let ((Name  (car Def))
         (Args  (cdr Def)))
@@ -550,20 +558,19 @@
 ;; =====================================
 
 (de (array:each Xs F)
-  (let ((I   0)
-        (Len (array:len Xs)))
-    (while (> Len I)
-      (F (array:get Xs I) I)
-      (set! I (+ I 1)))
+  (let ((Len (array:len Xs)))
+    (loop rec ((I 0))
+      (when (> Len I)
+        (F (array:get Xs I) I)
+        (rec (inc I))))
     Xs))
 
 (de (array:each-back Xs F)
-  (let ((Len (array:len Xs))
-        (I   (- Len 1)))
-    (while (> I -1)
+  (loop rec ((I (dec (array:len Xs))))
+    (when (> I -1)
       (F (array:get Xs I) I)
-      (set! I (- I 1)))
-    Xs))
+      (rec (dec I))))
+  Xs)
 
 (de (array:list Xs)
   (let ((Acc nil))
@@ -575,20 +582,19 @@
 ;; =====================================
 
 (de (bytes:each Xs F)
-  (let ((I   0)
-        (Len (bytes:len Xs)))
-    (while (> Len I)
-      (F (bytes:get Xs I) I)
-      (set! I (+ I 1)))
+  (let ((Len (bytes:len Xs)))
+    (loop rec ((I 0))
+      (when (> Len I)
+        (F (bytes:get Xs I) I)
+        (rec (inc I))))
     Xs))
 
 (de (bytes:each-back Xs F)
-  (let ((Len (bytes:len Xs))
-        (I   (- Len 1)))
-    (while (> I -1)
+  (loop rec ((I (dec (bytes:len Xs))))
+    (when (> I -1)
       (F (bytes:get Xs I) I)
-      (set! I (- I 1)))
-    Xs))
+      (rec (dec I))))
+  Xs)
 
 (de (bytes:list Xs)
   (let ((Acc nil))
@@ -603,12 +609,19 @@
   ;; in-place
   (let ((Last nil)
         (Next nil))
-    (while Xs
-      (set! Next (cdr Xs))
-      (set-cdr! Xs Last)
-      (set! Last Xs)
-      (set! Xs Next))
+    (loop rec ((Xs Xs))
+      (when Xs
+        (set! Next (cdr Xs))
+        (set-cdr! Xs Last)
+        (set! Last Xs)
+        (rec Next)))
     Last))
+
+(de (list:reverse Xs)
+  (loop rec ((Xs Xs) (Acc nil))
+    (if Xs
+      (rec (cdr Xs) (cons (car Xs) Acc))
+      Acc)))
 
 (de (list:cons* X . Xs)
   ;; (cons* 1 2 3) => (1 2 . 3)
@@ -624,12 +637,12 @@
 ;; =====================================
 
 (de (str:chars S)
-  (let ((I   0)
-        (Len (str:len S))
+  (let ((Len (str:len S))
         (Xs  (array:new Len)))
-    (while (> Len I)
-      (array:set! Xs I (str:get S I))
-      (set! I (+ I 1)))
+    (loop rec ((I 0))
+      (when (> Len I)
+        (array:set! Xs I (str:get S I))
+        (rec (inc I))))
     Xs))
 
 

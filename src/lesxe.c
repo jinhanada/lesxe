@@ -33,7 +33,7 @@ enum {
       SymQuote, SymQuasiquote,
       SymUnquote, SymUnquoteSplicing,
       SymLet, SymFn, SymDef, SymIf, SymSet,
-      SymWhile, SymBreak, SymContinue,
+      SymContinue,
       SymApply, SymCatch, SymPreEval,
 
       /* types */
@@ -1329,64 +1329,27 @@ static int findLocal(LeVM* vm, Obj env, Obj sym) {
 
 // ===== Syntax =====
 
-static int evalExprs(LeVM* vm, Obj xs) {
+static int evalExprs(LeVM* vm, Obj xs, Obj* last) {
+  // For tail call optimization, last expression won't be
+  // evaled and set to &last
   SaveStack;
   // exprs should be a pair or nil
   int code = Le_OK;
-
   vm->result = nil;
-  while (xs != nil) {
+  *last = nil;
+  if (xs == nil) return Le_OK; // no expression
+
+  while (Cdr(xs) != nil) {
     Obj expr = Car(xs);
     Push(Cdr(xs));
-    code = eval(vm, expr); // vm->result holds last result
+    code = eval(vm, expr);
     if (code != Le_OK) RestoreReturn(code);
 
     xs = Pop();
   }
   
-  // again, vm->result holds last result
+  *last = Car(xs); // last expression
   return Le_OK;
-}
-
-static int evalLet(LeVM* vm, Obj rest) {
-  // (let ((var val) ...) expr ...)
-  // env: ( ((var . val) ...) ... )
-  SaveStack;
-  int env_i = Push(vm->env);
-  Obj binds = Car(rest);
-  Obj body = Cdr(rest);
-  Push(body);
-  int code = Le_OK;
-
-  vm->env = le_cons(vm, nil, vm->env);
-  while (binds) {
-    Push(binds);
-    Obj bind = Car(binds);
-    Obj var = Car(bind);
-    Obj val = Second(bind);
-    Push(var);
-    code = eval(vm, val);
-    if (code != Le_OK) {
-      vm->env = le_stack_at(vm, env_i);
-      RestoreReturn(code);
-    }
-
-    val = vm->result;
-    var = Pop();
-    // create bind var/val on env, as dotted pair
-    bind = le_cons(vm, var, val);
-    Obj env = le_cons(vm, bind, Car(vm->env));
-    SetCar(vm->env, env);
-    // next
-    binds = Cdr(Pop());
-  }
-  
-  body = Pop();
-  code = evalExprs(vm, body);
-  // result or err is set on vm
-  vm->env = Pop();
-  
-  return code;
 }
 
 static int evalFn(LeVM* vm, Obj rest) {
@@ -1427,17 +1390,18 @@ static int evalArgs(LeVM* vm, Obj args) {
   return Le_OK;
 }
 
-static int applyFunc(LeVM* vm, Obj func, Obj args) {
-  // func should be type checked
 
-  // swap env
-  Push(vm->env);
+static void buildFuncEnv(LeVM* vm, Obj func, Obj args) {
+  // vm->env should be restored by caller
+  // func and args should be evaled yet
+
+  // static env
   vm->env = func->Func.env;
   
-  // create env
-  Push(func);
+  // create apply env
   Obj vars = func->Func.vars;
   Obj env = nil;
+  
   while (vars != nil) {
     // rest
     if (le_is_symbol(vars)) {
@@ -1456,11 +1420,26 @@ static int applyFunc(LeVM* vm, Obj func, Obj args) {
     args = Cdr(Pop());
     vars = Cdr(Pop());
   }
+
+  // set
   vm->env = le_cons(vm, env, vm->env);
+}
+
+static int applyFunc(LeVM* vm, Obj func, Obj args) {
+  // func should be type checked
+  SaveStack;
+  Obj last;
+  
+  // swap env
+  Push(vm->env);
+  Push(func);
+  buildFuncEnv(vm, func, args);
   func = Pop();
 
   // apply
-  int code = evalExprs(vm, func->Func.code);
+  int code = evalExprs(vm, func->Func.code, &last);
+  if (code != Le_OK) RestoreReturn(code);
+  code = eval(vm, last);
   // result or err is set on vm
   
   // restore env
@@ -1481,22 +1460,6 @@ static int evalDef(LeVM* vm, Obj xs) {
   var = Pop();
   setGlobal(vm, var, val);
   return Le_OK;
-}
-
-static int evalIf(LeVM* vm, Obj xs) {
-  SaveStack;
-  Obj cond = Car(xs);
-  Obj then = Second(xs);
-  Obj els  = Third(xs);
-  Push(els);
-  Push(then);
-  int code = eval(vm, cond);
-  if (code != Le_OK) RestoreReturn(code);
-
-  then = Pop(); // then
-  els  = Pop();
-  Obj expr = vm->result != nil ? then : els;
-  return eval(vm, expr);
 }
 
 static int evalSet(LeVM* vm, Obj xs) {
@@ -1530,28 +1493,6 @@ static int evalSet(LeVM* vm, Obj xs) {
   return RaiseWith(UndefinedSymbol, var);
 }
 
-static int evalWhile(LeVM* vm, Obj xs) {
-  SaveStack;
-  Obj cond = Car(xs);
-  Obj body = Cdr(xs);
- 
-  int cond_i = Push(cond);
-  int body_i = Push(body);
-  int code = eval(vm, cond);
-  while (code == Le_OK && vm->result != nil) {
-    body = le_stack_at(vm, body_i);
-    code = evalExprs(vm, body);
-    if (code == Le_Continue) code = Le_OK;
-    if (code == Le_Break)    break;
-    if (code != Le_OK) RestoreReturn(code);
-    cond = le_stack_at(vm, cond_i);
-    code = eval(vm, cond);
-  }
-
-  vm->result = nil;
-  RestoreReturn(Le_OK);
-}
-
 static int evalCatch(LeVM* vm, Obj xs) {
   // (catch expr fn)
   SaveStack;
@@ -1577,21 +1518,6 @@ static int evalCatch(LeVM* vm, Obj xs) {
   Obj args = Cons(vm, err, nil);
   f = Pop();
 
-  return applyFunc(vm, f, args);
-}
-
-static int evalQuote(LeVM* vm, Obj xs) {
-  vm->result = xs;
-  return Le_OK;
-}
-
-static int evalApply(LeVM* vm, Obj xs) {
-  // (apply F Args)
-  // F and Args should be evaled
-  Obj f    = Car(xs);
-  Obj args = Second(xs);
-  if (!le_is_func(f))
-    return RaiseWith(NotAProc, f);
   return applyFunc(vm, f, args);
 }
 
@@ -2111,57 +2037,7 @@ static int primLoadFile(LeVM* vm, Obj args) {
 }
 
 
-// ===== Pair =====
-
-static int evalPair(LeVM* vm, Obj xs) {
-  SaveStack;
-  Obj first = Car(xs);
-  Obj rest  = Cdr(xs);
-  int code;
-
-  // Syntax
-  if (first == Sym(Let))      return evalLet(vm, rest);
-  if (first == Sym(Fn))       return evalFn(vm, rest);
-  if (first == Sym(Def))      return evalDef(vm, rest);
-  if (first == Sym(If))       return evalIf(vm, rest);
-  if (first == Sym(Set))      return evalSet(vm, rest);
-  if (first == Sym(While))    return evalWhile(vm, rest);
-  if (first == Sym(Break))    return Le_Break;
-  if (first == Sym(Continue)) return Le_Continue;
-  if (first == Sym(Catch))    return evalCatch(vm, rest);
-  if (first == Sym(Quote))    return evalQuote(vm, rest);
-
-  // eval args
-  Push(first);
-  code = evalArgs(vm, rest);
-  if (code != Le_OK) RestoreReturn(code);
-  Obj args = vm->result;
-  first = Pop();
-
-  if (first == Sym(Apply))
-    return evalApply(vm, args);
-
-  // primitive
-  if (le_is_symbol(first) && first->Symbol.prim != nil) {
-    int i = le_obj2int(first->Symbol.prim);
-    PrimHandler f = PrimitiveTable[i];
-    return f(vm, args);
-  }
-
-  // eval f
-  Push(args);
-  code = eval(vm, first);
-  ExpectOK;
-  Obj f = vm->result;
-  args = Pop();  
-
-  if (le_is_func(f)) return applyFunc(vm, f, args);
-
-  return RaiseWith(NotAProc, f);
-}
-
-
-// ===== Symbol =====
+// ===== Eval =====
 
 static int evalSymbol(LeVM* vm, Obj sym) {
   // binds: ( ((var . val) ...) ... )
@@ -2182,23 +2058,150 @@ static int evalSymbol(LeVM* vm, Obj sym) {
 }
 
 
-// ===== Eval =====
+static int buildLetEnv(LeVM* vm, Obj binds) {
+  // inplace!
+  // Restoreing vm->env is guaranteed by eval()
+  SaveStack;
+  vm->env = le_cons(vm, nil, vm->env);
+
+  int code = Le_OK;
+  while (binds) {
+    Push(binds);
+    Obj bind = Car(binds);
+    Obj var = Car(bind);
+    Obj val = Second(bind);
+    Push(var);
+    code = eval(vm, val);
+    if (code != Le_OK) RestoreReturn(code);
+    
+    val = vm->result;
+    var = Pop();
+    // create bind var/val on env, as dotted pair
+    bind = le_cons(vm, var, val);
+    Obj env = le_cons(vm, bind, Car(vm->env));
+    SetCar(vm->env, env);
+    // next
+    binds = Cdr(Pop());
+  }
+  return code;
+}
+
+static int evalAux(LeVM* vm, Obj expr) {
+  while (1) {
+    if (expr == nil || le_is_num(expr) || le_is_string(expr)) {
+      vm->result = expr;
+      return Le_OK;
+    }
+
+    if (le_is_symbol(expr))
+      return evalSymbol(vm, expr);
+
+    if (!le_is_pair(expr))
+      DIE("Can't eval %s", toStr(expr));
+  
+    SaveStack;
+    Obj first = Car(expr);
+    Obj rest  = Cdr(expr);
+    int code;
+
+    // ----- Syntaxes not having tail call
+    
+    if (first == Sym(Fn))       return evalFn(vm, rest);
+    if (first == Sym(Def))      return evalDef(vm, rest);
+    if (first == Sym(Set))      return evalSet(vm, rest);
+    if (first == Sym(Continue)) return Le_Continue;
+    if (first == Sym(Catch))    return evalCatch(vm, rest);
+    
+    if (first == Sym(Quote)) {
+      vm->result = rest;
+      return Le_OK;
+    }
+
+    // ----- Syntaxes having tail call
+
+    if (first == Sym(If)) {
+      Obj cond = Car(rest);
+      Obj then = Second(rest);
+      Obj els  = Third(rest);
+      Push(els);
+      Push(then);
+      code = eval(vm, cond);
+      if (code != Le_OK) RestoreReturn(code);
+      
+      then = Pop(); // then
+      els  = Pop();
+      expr = vm->result != nil ? then : els;
+      continue; // tail call!
+    }
+    
+    if (first == Sym(Let)) {
+      // (let ((var val) ...) expr ...)
+      // env: ( ((var . val) ...) ... )
+      Obj binds = Car(rest);
+      Obj body = Cdr(rest);
+      Push(body);
+
+      code = buildLetEnv(vm, binds);
+      if (code != Le_OK) RestoreReturn(code);
+  
+      body = Pop();
+      code = evalExprs(vm, body, &expr);
+      ExpectOK;
+
+      continue; // tail call!
+    }
+    
+    // ----- Eval args
+    Push(first);
+    code = evalArgs(vm, rest);
+    if (code != Le_OK) RestoreReturn(code);
+    Obj args = vm->result;
+    first = Pop();
+
+    // ----- Primitive
+    if (le_is_symbol(first) && first->Symbol.prim != nil) {
+      int i = le_obj2int(first->Symbol.prim);
+      PrimHandler f = PrimitiveTable[i];
+      return f(vm, args);
+    }
+
+    // ----- Tail Call Func Application
+    // last expr of func body should be tail called
+    Obj f;
+
+    if (first == Sym(Apply)) {
+      // (apply f args)
+      f = Car(args);
+      args = Second(args);
+    } else {
+      // (f . args)
+      Push(args);
+      code = eval(vm, first);
+      ExpectOK;
+      f = vm->result;
+      args = Pop();
+    }
+
+    if (!le_is_func(f)) return RaiseWith(NotAProc, f);
+
+    Push(f);
+    buildFuncEnv(vm, f, args);
+    f = Pop();
+
+    // apply
+    code = evalExprs(vm, f->Func.code, &expr);
+    if (code != Le_OK) RestoreReturn(code);
+    continue; // tail call!
+  }
+  
+  DIE("How do you reach here!?");
+}
 
 static int eval(LeVM* vm, Obj expr) {
-  if (expr == nil || le_is_num(expr) || le_is_string(expr)) {
-    vm->result = expr;
-    return Le_OK;
-  }
-
-  if (le_is_pair(expr)) {
-    return evalPair(vm, expr);
-  }
-
-  if (le_is_symbol(expr)) {
-    return evalSymbol(vm, expr);
-  }
-
-  DIE("Unimplemented eval for %s", toStr(expr));
+  Push(vm->env);
+  int code = evalAux(vm, expr);
+  vm->env = Pop();
+  return code;
 }
 
 
@@ -2368,9 +2371,6 @@ static void setupSymbols(LeVM* vm) {
   DefSym(Def,                   "def");
   DefSym(If,                    "if");
   DefSym(Set,                   "set!");
-  DefSym(While,                 "while");
-  DefSym(Break,                 "break");
-  DefSym(Continue,              "continue");
   DefSym(Apply,                 "apply");
   DefSym(Catch,                 "catch");
   DefSym(PreEval,               "%pre-eval");

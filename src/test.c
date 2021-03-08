@@ -550,30 +550,6 @@ void test_eval_set(LeVM* vm) {
   assert(le_obj2int(x) == 234);  
 }
 
-void test_eval_while(LeVM* vm) {
-  int code;
-  Obj x;
-  char* src;
-
-  src = "(let ((i 0)) (while (%prim:gt 10 i) (set! i (%prim:add i 1))) i)";
-  code = le_eval_str(vm, src);
-  x = vm->result;
-  AssertOK;
-  assert(le_obj2int(x) == 10);
-
-  src =
-    "(let ((i 0))"
-    "  (while true"
-    "    (set! i (%prim:add i 1))"
-    "    (if (%prim:gt 10 i) (continue))"
-    "    (break)) i)"
-    ;
-  code = le_eval_str(vm, src);
-  x = vm->result;
-  AssertOK;
-  assert(le_obj2int(x) == 10);    
-}
-
 void test_eval_predefined_symbols(LeVM* vm) {
   int code = le_eval_str(vm, "nil");
   Obj x = vm->result;
@@ -606,6 +582,23 @@ void test_eval_pre_eval(LeVM* vm) {
   x = vm->result;
   AssertOK;
   assert(le_obj2int(x) == 123);
+}
+
+void test_eval_tco(LeVM* vm) {
+  int code;
+  char* src;
+
+  // let, if, and func body should be tail call optimized
+  // or this test die for temp stack overflow
+
+  src =
+    "(let ((Max 100000) (F nil))"
+    "  (set! F (fn (X) (let ((N nil)) N (if (%prim:gt Max X) (F (%prim:add X 1)) X))))"
+    "  (F 0))"
+    ;
+  code = le_eval_str(vm, src);
+  AssertOK;
+  assert(le_obj2int(vm->result) == 100000);
 }
 
 // Primitives
@@ -766,10 +759,10 @@ void test_all() {
   testVM(eval_arithmetics);
   testVM(eval_compare);
   testVM(eval_set);
-  testVM(eval_while);
   testVM(eval_predefined_symbols);
   testVM(eval_quote);
   testVM(eval_pre_eval);
+  testVM(eval_tco);
   // primitives
   testVM(prim_array);
   testVM(prim_pair);
