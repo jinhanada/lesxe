@@ -2194,7 +2194,7 @@ static int evalAux(LeVM* vm, Obj expr) {
       return f(vm, args);
     }
 
-    // ----- Func Application
+    // ----- Tail Call Func Application
     // last expr of func body should be tail called
     Obj f;
 
@@ -2213,9 +2213,14 @@ static int evalAux(LeVM* vm, Obj expr) {
 
     if (!le_is_func(f)) return RaiseWith(NotAProc, f);
 
-    return applyFunc(vm, f, args);
-    
-    break;
+    Push(f);
+    buildFuncEnv(vm, f, args);
+    f = Pop();
+
+    // apply
+    code = evalExprs(vm, f->Func.code, &expr);
+    if (code != Le_OK) RestoreReturn(code);
+    continue; // tail call!
   }
   
   DIE("How do you reach here!?");
