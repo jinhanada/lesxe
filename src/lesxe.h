@@ -38,6 +38,7 @@ int le_is_obj(LeObj* p);
 int le_is_array(LeObj* p);
 int le_is_symbol(LeObj* p);
 int le_is_pair(LeObj* p);
+int le_is_list(LeObj* p);
 int le_is_func(LeObj* p);
 int le_is_bytes(LeObj* p);
 int le_is_string(LeObj* p);

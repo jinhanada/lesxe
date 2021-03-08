@@ -373,6 +373,11 @@ Public int le_is_pair(Obj p) {
   return le_typeof(p) == Le_pair;
 }
 
+Public int le_is_list(Obj p) {
+  // nil is ok
+  return p == nil || le_is_pair(p);
+}
+
 Public int le_is_func(Obj p) {
   return le_typeof(p) == Le_func;
 }
@@ -1466,8 +1471,7 @@ static int evalSet(LeVM* vm, Obj xs) {
   SaveStack;
   Obj var = Car(xs);
   Obj val = Second(xs);
-  if (!le_is_symbol(var))
-    return RaiseWith(InvalidArgs, xs);
+  ExpectType(symbol, var);
 
   // eval value
   Push(var);
@@ -1510,8 +1514,7 @@ static int evalCatch(LeVM* vm, Obj xs) {
   if (code != Le_OK) RestoreReturn(code);
   
   f = vm->result;
-  if (!le_is_func(vm->result))
-    RestoreReturn(RaiseWith(InvalidArgs, f));
+  ExpectType(func, vm->result);
 
   Obj err = Pop();
   Push(f);
@@ -1609,8 +1612,8 @@ static int primGt(LeVM* vm, Obj args) {
   Obj a = Car(args);
   Obj b = Second(args);
 
-  if (!le_is_num(a) || !le_is_num(b))
-    return RaiseWith(ExpectInteger, args);
+  ExpectType(num, a);
+  ExpectType(num, b);
   int na = le_obj2int(a);
   int nb = le_obj2int(b);
   vm->result = na > nb ? Sym(True) : nil;
@@ -1650,8 +1653,7 @@ static int primHash(LeVM* vm, Obj args) {
 
 static int primArrayNew(LeVM* vm, Obj args) {
   Obj x = Car(args);
-  if (!le_is_num(x))
-    return RaiseWith(InvalidArgs, args);
+  ExpectType(num, x);
   int len = le_obj2int(x);
   vm->result = le_new_array(vm, len);
   return Le_OK;
@@ -1660,8 +1662,8 @@ static int primArrayNew(LeVM* vm, Obj args) {
 static int primArrayGet(LeVM* vm, Obj args) {
   Obj xs = Car(args);
   Obj obj_i  = Second(args);
-  if (!(le_is_array(xs) && le_is_num(obj_i)))
-    return RaiseWith(InvalidArgs, args);
+  ExpectType(array, xs);
+  ExpectType(num, obj_i);
   int i = le_obj2int(obj_i);
   if (i < 0 || i >= le_array_len(xs))
     return RaiseWith(OutOfRange, args);
@@ -1673,8 +1675,8 @@ static int primArraySet(LeVM* vm, Obj args) {
   Obj xs = Car(args);
   Obj obj_i  = Second(args);
   Obj val = Third(args);
-  if (!(le_is_array(xs) && le_is_num(obj_i)))
-    return RaiseWith(InvalidArgs, args);
+  ExpectType(array, xs);
+  ExpectType(num, obj_i);
   int i = le_obj2int(obj_i);
   if (i < 0 || i >= le_array_len(xs))
     return RaiseWith(OutOfRange, args);  
@@ -1685,8 +1687,7 @@ static int primArraySet(LeVM* vm, Obj args) {
 
 static int primArrayLen(LeVM* vm, Obj args) {
   Obj xs = Car(args);
-  if (!le_is_array(xs))
-    return RaiseWith(InvalidArgs, args);
+  ExpectType(array, xs);
   vm->result = le_int2obj(le_array_len(xs));
   return Le_OK;
 }
@@ -1701,16 +1702,14 @@ static int primCons(LeVM* vm, Obj args) {
 
 static int primCar(LeVM* vm, Obj args) {
   Obj xs = Car(args);
-  if (xs != nil && !le_is_pair(xs))
-    return RaiseWith(InvalidArgs, args);
+  ExpectType(list, xs);
   vm->result = Car(xs);
   return Le_OK;
 }
 
 static int primCdr(LeVM* vm, Obj args) {
   Obj xs = Car(args);
-  if (xs != nil && !le_is_pair(xs))
-    return RaiseWith(InvalidArgs, args);
+  ExpectType(list, xs);
   vm->result = Cdr(xs);
   return Le_OK;
 }
@@ -1718,8 +1717,7 @@ static int primCdr(LeVM* vm, Obj args) {
 static int primSetCar(LeVM* vm, Obj args) {
   Obj xs = Car(args);
   Obj x  = Second(args);
-  if (xs != nil && !le_is_pair(xs))
-    return RaiseWith(InvalidArgs, args);
+  ExpectType(list, xs);
   SetCar(xs, x);
   vm->result = xs;
   return Le_OK;
@@ -1728,8 +1726,7 @@ static int primSetCar(LeVM* vm, Obj args) {
 static int primSetCdr(LeVM* vm, Obj args) {
   Obj xs = Car(args);
   Obj x  = Second(args);
-  if (xs != nil && !le_is_pair(xs))
-    return RaiseWith(InvalidArgs, args);
+  ExpectType(list, xs);
   SetCdr(xs, x);
   vm->result = xs;
   return Le_OK;
@@ -1741,8 +1738,7 @@ static int primSetCdr(LeVM* vm, Obj args) {
 static int primSymNew(LeVM* vm, Obj args) {
   // (%prim:sym-new Str) => Symbol
   Obj name = Car(args);
-  if (!le_is_string(name))
-    return RaiseWith(InvalidArgs, args);
+  ExpectType(string, name);
   char* s = le_cstr_of(name);
   vm->result = le_new_sym_from(vm, s);
   return Le_OK;
@@ -1751,8 +1747,7 @@ static int primSymNew(LeVM* vm, Obj args) {
 static int primSymStr(LeVM* vm, Obj args) {
   // (%prim:sym-str Sym) => String
   Obj sym = Car(args);
-  if (!le_is_symbol(sym))
-    return RaiseWith(InvalidArgs, args);
+  ExpectType(symbol, sym);
   vm->result = sym->Symbol.name;
   return Le_OK;
 }
@@ -1773,8 +1768,8 @@ static int primStrEq(LeVM* vm, Obj args) {
   // (%prim:str-eq A B) => true/nil
   Obj a = Car(args);
   Obj b = Second(args);
-  if (!(le_is_string(a) && le_is_string(b)))
-    return RaiseWith(InvalidArgs, args);
+  ExpectType(string, a);
+  ExpectType(string, b);
   vm->result = le_str_eq(a, b) ? Sym(True) : nil;
   return Le_OK;
 }
@@ -1816,8 +1811,7 @@ static int primStrCat(LeVM* vm, Obj args) {
 
 static int primStrLen(LeVM* vm, Obj args) {
   Obj str = Car(args);
-  if (!le_is_string(str))
-    return RaiseWith(InvalidArgs, args);
+  ExpectType(string, str);
   
   int len = le_str_len(str);
   vm->result = le_int2obj(len);
@@ -1827,8 +1821,8 @@ static int primStrLen(LeVM* vm, Obj args) {
 static int primStrGet(LeVM* vm, Obj args) {
   Obj str = Car(args);
   Obj obj_i = Second(args);
-  if (!(le_is_string(str) && le_is_num(obj_i)))
-    return RaiseWith(InvalidArgs, args);
+  ExpectType(string, str);
+  ExpectType(num, obj_i);
   
   int i = le_obj2int(obj_i);
   if (i < 0 || i >= le_str_len(str))
@@ -1842,16 +1836,15 @@ static int primStrGet(LeVM* vm, Obj args) {
 static int primStrMake(LeVM* vm, Obj args) {
   // (%prim:str-make ArrayOfChars) => String
   Obj xs = Car(args);
-  if (!le_is_array(xs))
-    return RaiseWith(InvalidArgs, args);
+  ExpectType(array, xs);
+
   int len = le_array_len(xs);
   Push(xs);
   Obj str = le_new_str(vm, len);
   xs = Pop();
   for (int i = 0; i < len; i++) {
     Obj c = xs->Array.data[i];
-    if (!le_is_num(c))
-      return RaiseWith(ExpectInteger, xs);
+    ExpectType(num, c);
     str->Bytes.data[i] = (char)(le_obj2int(c));
   }
   str->Bytes.data[len] = '\0';
@@ -1864,8 +1857,7 @@ static int primStrMake(LeVM* vm, Obj args) {
 
 static int primBytesNew(LeVM* vm, Obj args) {
   Obj x = Car(args);
-  if (!le_is_num(x))
-    return RaiseWith(ExpectInteger, args);
+  ExpectType(num, x);
   int len = le_obj2int(x);
   vm->result = le_new_bytes(vm, len);
   return Le_OK;
@@ -1874,8 +1866,8 @@ static int primBytesNew(LeVM* vm, Obj args) {
 static int primBytesGet(LeVM* vm, Obj args) {
   Obj xs = Car(args);
   Obj obj_i  = Second(args);
-  if (!(le_is_bytes(xs) && le_is_num(obj_i)))
-    return RaiseWith(InvalidArgs, args);
+  ExpectType(bytes, xs);
+  ExpectType(num, obj_i);
   int i = le_obj2int(obj_i);
   if (i < 0 || i >= le_bytes_len(xs))
     return RaiseWith(OutOfRange, args);
@@ -1888,8 +1880,10 @@ static int primBytesSet(LeVM* vm, Obj args) {
   Obj xs = Car(args);
   Obj obj_i  = Second(args);
   Obj val = Third(args);
-  if (!(le_is_bytes(xs) && le_is_num(obj_i) && le_is_num(val)))
-    return RaiseWith(InvalidArgs, args);
+  ExpectType(bytes, xs);
+  ExpectType(num, obj_i);
+  ExpectType(num, val);
+
   int i = le_obj2int(obj_i);
 
   if (i < 0 || i >= le_bytes_len(xs))
@@ -1902,8 +1896,7 @@ static int primBytesSet(LeVM* vm, Obj args) {
 
 static int primBytesLen(LeVM* vm, Obj args) {
   Obj xs = Car(args);
-  if (!le_is_bytes(xs))
-    return RaiseWith(InvalidArgs, args);
+  ExpectType(bytes, xs);
   vm->result = le_int2obj(le_bytes_len(xs));
   return Le_OK;
 }
@@ -1924,8 +1917,8 @@ static int primPutc(LeVM* vm, Obj args) {
   // (%prim:putc FileDescriptor Char) => Char
   Obj var_fd   = Car(args);
   Obj var_char = Second(args);
-  if (!(le_is_num(var_fd) && le_is_num(var_char)))
-    return RaiseWith(InvalidArgs, args);
+  ExpectType(num, var_fd);
+  ExpectType(num, var_char);
 
   int fd = le_obj2int(var_fd);
   char c = le_obj2int(var_char);
@@ -1942,8 +1935,7 @@ static int primPutc(LeVM* vm, Obj args) {
 static int primGetc(LeVM* vm, Obj args) {
   // (%prim:getc FileDescriptor) => char(integer)
   Obj var_fd = Car(args);
-  if (!le_is_num(var_fd))
-    return RaiseWith(InvalidArgs, args);
+  ExpectType(num, var_fd);
 
   int fd = le_obj2int(var_fd);
   FILE* fp = fdopen(fd, "r");
@@ -1959,8 +1951,8 @@ static int primPrint(LeVM* vm, Obj args) {
   // (%prim:print FileDescriptor String) => String
   Obj obj_fd = Car(args);
   Obj str    = Second(args);
-  if (!(le_is_num(obj_fd) && le_is_string(str)))
-    return RaiseWith(InvalidArgs, args);
+  ExpectType(num, obj_fd);
+  ExpectType(string, str);
 
   int fd = le_obj2int(obj_fd);
   FILE* fp = fdopen(fd, "w");
@@ -2014,9 +2006,7 @@ static int primRaise(LeVM* vm, Obj args) {
 static int primExit(LeVM* vm, Obj args) {
   // (%prim:exit Code) => exit with code
   Obj code = Car(args);
-
-  if (!le_is_num(code))
-    return RaiseWith(InvalidArgs, args);
+  ExpectType(num, code);
 
   exit(le_obj2int(code));
   return Le_OK; // avoid warning
