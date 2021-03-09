@@ -58,7 +58,7 @@ enum {
       /* error */ SymPrimRaise,
       /* system */ SymPrimExit, SymPrimGC, SymPrimLoadFile,
       /* network */
-      SymPrimSocketMake, SymPrimSocketListen, SymPrimSocketAccept,
+      SymPrimSocketMake, SymPrimSocketListen, SymPrimSocketAccept, SymPrimSocketRecv,
       SymPrimSocketSend, SymPrimSocketClose,
       
       /* errors */
@@ -2118,15 +2118,15 @@ static int primSocketMake(LeVM* vm, Obj args) {
   // socket config
   addr.sin_family      = AF_INET;
   addr.sin_port        = htons(port);
-  addr.sin_addr.s_addr = INADDR_ANY; // 0.0.0.0
+  addr.sin_addr.s_addr = INADDR_ANY; // 0.0.0.0 
 
   //TODO pass option for SO_REUSEADDR what should be changed by env.dev
-  if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &(int){ 1 }, sizeof(int)) < 0)
+  if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &(int){ 1 }, sizeof(int)) != 0)
     return le_raise_str(vm, "Can't set socket option", nil);
 
   // bind
   int ret = bind(sockfd, (struct sockaddr*)&addr, sizeof(addr));
-  if (ret < 0)
+  if (ret != 0)
     return le_raise_str(vm, "Can't bind socket to 0.0.0.0, port", n);
 
   vm->result = le_int2obj(sockfd);
@@ -2163,33 +2163,55 @@ static int primSocketSend(LeVM* vm, Obj args) {
 }
 
 static int primSocketAccept(LeVM* vm, Obj args) {
-  // (%prim:sock-accept SockFD Limit) => (wsock . String)
+  // (%prim:sock-accept SockFD) => WSock
   Obj sockfd_o = Car(args);
-  Obj limit_o = Second(args);
   ExpectType(num, sockfd_o);
-  ExpectType(num, limit_o);
-
   int sockfd = le_obj2int(sockfd_o);
   
-  int wsock;
   struct sockaddr_in client;
   int  len = sizeof(client);
-  int  in_len = le_obj2int(limit_o);
-  char ibuf[in_len];
   
   // accept
-  wsock = accept(sockfd, (struct sockaddr*)&client, &len);
+  int wsock = accept(sockfd, (struct sockaddr*)&client, &len);
   if (wsock < 0)
     return le_raise_str(vm, "Accpet failed", nil);
-  
+
+  vm->result = le_int2obj(wsock);
+  return Le_OK;
+}
+
+static int primSocketRecv(LeVM* vm, Obj args) {
+  // (%prim:socket-recv WSockFD Limit) => Data | nil
+  Obj wsockfd_o = Car(args);
+  Obj limit_o = Second(args);
+  ExpectType(num, wsockfd_o);
+  ExpectType(num, limit_o);
+  int wsock = le_obj2int(wsockfd_o);
+  int limit = le_obj2int(limit_o);
+
+  // buffer
+  int  in_len = le_obj2int(limit_o);
+  char ibuf[in_len];
   memset(ibuf, 0, sizeof(ibuf));
+
+  // polling
+  struct pollfd fd;
+  int ret;
+  fd.fd = wsock;
+  fd.events = POLLIN;
+  ret = poll(&fd, 1, 1000);
+  if (ret == 0) {
+    vm->result = nil;
+    return Le_OK;
+  }
+  
   if (recv(wsock, ibuf, sizeof(ibuf), 0) < 0)
     return le_raise_str(vm, "Receive failed", nil);
 
-  Obj received = le_new_str_from(vm, ibuf);
-  vm->result = Cons(vm, le_int2obj(wsock), received);
+  ibuf[in_len] = '\0';
+  vm->result = le_new_str_from(vm, ibuf);
 
-  return Le_OK;
+  return Le_OK;  
 }
 
 static int primSocketClose(LeVM* vm, Obj args) {
@@ -2197,7 +2219,9 @@ static int primSocketClose(LeVM* vm, Obj args) {
   Obj sockfd = Car(args);
   ExpectType(num, sockfd);
   int fd = le_obj2int(sockfd);
-  close(fd);
+  if (close(fd) != 0)
+    return le_raise_str(vm, "Close failed", sockfd);
+    
   return Le_OK;
 }
 
@@ -2628,6 +2652,7 @@ static void setupPrimitives(LeVM* vm) {
   DefPrim(SocketMake,        "socket-make");
   DefPrim(SocketListen,      "socket-listen");
   DefPrim(SocketAccept,      "socket-accept");
+  DefPrim(SocketRecv,        "socket-recv");
   DefPrim(SocketSend,        "socket-send");
   DefPrim(SocketClose,       "socket-close");
 }

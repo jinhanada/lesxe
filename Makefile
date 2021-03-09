@@ -5,10 +5,6 @@ SRCS = $(SRC)/lesxe.c $(SRC)/lesxe.h
 
 CFLAGS += -g
 
-.PHONY: run
-run: all
-	rlwrap ./bin/lesxe
-
 
 .PHONY: all
 all: $(BIN)/lesxe $(BIN)/text2c
@@ -47,3 +43,7 @@ memcheck: all test
 		--log-file=out/valgrind.log \
 		./out/test_lesxe
 
+
+.PHONY: run
+run: all
+	rlwrap ./bin/lesxe

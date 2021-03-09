@@ -303,7 +303,8 @@
 (def sock:make   (fn (Port) (%prim:socket-make Port)))
 (def sock:listen (fn (SockFD Limit) (%prim:socket-listen SockFD Limit)))
 (def sock:send   (fn (SockFD Str) (%prim:socket-send SockFD Str)))
-(def sock:accept (fn (SockFD Limit) (%prim:socket-accept SockFD Limit)))
+(def sock:accept (fn (SockFD ) (%prim:socket-accept SockFD)))
+(def sock:recv   (fn (SockFD Limit) (%prim:socket-recv SockFD Limit)))
 (def sock:close  (fn (SockFD) (%prim:socket-close SockFD)))
 
 
