@@ -572,6 +572,9 @@
 (de (sys:load FName)
   (%prim:load-file FName))
 
+(de (sys:load-files Files)
+  (list:each Files sys:load))
+
 
 ;; Array 2
 ;; =====================================
