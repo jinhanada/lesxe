@@ -2219,6 +2219,8 @@ static int primSocketClose(LeVM* vm, Obj args) {
   Obj sockfd = Car(args);
   ExpectType(num, sockfd);
   int fd = le_obj2int(sockfd);
+  if (shutdown(fd, SHUT_RDWR) != 0)
+    return le_raise_str(vm, "Shutdown failed", sockfd);
   if (close(fd) != 0)
     return le_raise_str(vm, "Close failed", sockfd);
     
