@@ -144,7 +144,7 @@
                (list:each Req prn))
              (sock:send WSock Res))
            (let ()
-             (prn "===== no data arrived =====")
+             (prn "===== no data arrived =====" WSock)
              (sock:send WSock "")))
          (sock:close WSock)
          (prn "===== wsock closed =====\n"))
