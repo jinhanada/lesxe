@@ -33,6 +33,7 @@
     (str "HTTP/1.0 200 OK\r\n"
          "Content-Length: " Len "\r\n"
          "Content-Type: text/html\r\n"
+         "Connection: close\r\n"
          "\r\n"
          Html
          "\r\n\r\n")))

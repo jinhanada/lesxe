@@ -2157,7 +2157,10 @@ static int primSocketSend(LeVM* vm, Obj args) {
   
   char* out = le_cstr_of(str);
   int   len = le_str_len(str);
-  send(le_obj2int(sockfd), out, len, 0);
+  int  sock = le_obj2int(sockfd);
+  send(sock, out, len, 0);
+
+  shutdown(sock, SHUT_WR);
 
   return Le_OK;
 }
