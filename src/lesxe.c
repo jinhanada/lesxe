@@ -613,6 +613,30 @@ static LeObj* newBytesObj(LeVM* vm, int bytes, int type) {
 }
 
 
+// ===== Conservative GC =====
+
+static void traverseStack(void* start) {
+  void *top, *bottom;
+  int delta;
+  
+  if (start < (void*)&top) {
+    // stack grows toward higher addr
+    top    = &top;
+    bottom = start;
+  } else {
+    // stack grows toward lower addr
+    top    = start;
+    bottom = &top;
+  }
+
+  for (void* p = top; p >= bottom; p = ((Byte*)p) - sizeof(void*)) {
+    assert((Cell)p == align((Cell)p));
+    Obj x = *(Obj*)p;
+    DBG("%p %p", p, x);
+  }
+}
+
+
 // Data Types
 // =============================================================================
 

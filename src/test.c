@@ -285,6 +285,14 @@ void test_gc_integration() {
   }
 }
 
+
+// ===== Conservative GC Test =====
+
+void test_traverse_stack(LeVM* vm) {
+  void* start;
+  traverseStack(&start);
+}
+
 // Macros for VM test
 // =====================================
 #define AssertOK (assert(code == Le_OK))
@@ -740,6 +748,7 @@ void test_all() {
   test(align);
   test(tagged_pointer);
   test(object_header);
+  // Copying GC
   test(memory);
   test(allot_object);
   test(bytes_object);
@@ -747,7 +756,11 @@ void test_all() {
   test(gc_swap);
   test(gc_move);
   test(gc_integration);
+  // Conservative GC
+  testVM(traverse_stack);
+  // Read
   testVM(read_sxp);
+  // Object
   testVM(hash);
   // eval
   testVM(eval_num);
