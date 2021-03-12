@@ -290,7 +290,7 @@ void test_gc_integration() {
 
 void test_traverse_stack(LeVM* vm) {
   void* start;
-  traverseStack(&start);
+  markStack(vm, &start);
 }
 
 // Macros for VM test

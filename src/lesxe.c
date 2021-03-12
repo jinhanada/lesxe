@@ -397,7 +397,7 @@ Public int le_is_string(Obj p) {
 // ===== Hash =====
 // nil: 0
 // number: そのもの
-// string: 文字列の実体から計算
+// string: 文字列の実体からDJB2で計算
 // other: 現在のアドレスを、2進数で最下位の固定ゼロが消えるようにシフトしたもの
 
 static Cell hashDJB2(char* s) {
@@ -615,7 +615,13 @@ static LeObj* newBytesObj(LeVM* vm, int bytes, int type) {
 
 // ===== Conservative GC =====
 
-static void traverseStack(void* start) {
+static void markObj(LeVM* vm, Obj p) {
+  if (!le_is_obj(p)) return;
+  
+  DBG("obj: %p", p);
+}
+
+static void markStack(LeVM* vm, void* start) {
   void *top, *bottom;
   int delta;
   
@@ -632,7 +638,7 @@ static void traverseStack(void* start) {
   for (void* p = top; p >= bottom; p = ((Byte*)p) - sizeof(void*)) {
     assert((Cell)p == align((Cell)p));
     Obj x = *(Obj*)p;
-    DBG("%p %p", p, x);
+    markObj(vm, x);
   }
 }
 
