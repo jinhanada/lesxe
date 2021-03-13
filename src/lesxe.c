@@ -127,6 +127,7 @@ struct LeObj {
 
 typedef struct ObjLink {
   intptr_t hash;
+  intptr_t cells; // for searching free list
   LeObj*   obj;
   struct ObjLink* next;
 } ObjLink;
@@ -149,6 +150,7 @@ struct LeVM {
   Link*    objTable;
   int      objTableLen;
   intptr_t objCount;
+  intptr_t nextGC;
   Link     freeList;
   LeObj*   addrMax;
   LeObj*   addrMin;
@@ -709,32 +711,76 @@ static void markStack(LeVM* vm, void* start) {
   }
 }
 
+static void markAll(LeVM* vm) {
+  DIE("TODO");
+}
+
+static void sweepAll(LeVM* vm) {
+  DIE("TODO");
+}
+
+static void runGC(LeVM* vm) {
+  markAll(vm);
+  sweepAll(vm);
+}
+
 // ===== allocate =====
 
-static void pushObj(LeVM* vm, Obj x) {
+static void pushObj(LeVM* vm, Obj x, Cell cells) {
   Cell hash = conservativeHash(x);
   int len = vm->objTableLen;
   Cell index = hash % len;
   
   Link link = calloc(sizeof(ObjLink), 1);
   link->hash = hash;
+  link->cells = cells;
   link->obj = x;
   link->next = vm->objTable[index];
   vm->objTable[index] = link;
 }
 
+static Obj searchFreeList(LeVM* vm, Cell cells, Cell header) {
+  Link free = vm->freeList;
+  while (free) {
+    if (free->cells >= cells) {
+      Obj x = free->obj;
+      Cell realCells = free->cells;
+      memset(&(x->Array.data), nil, realCells * sizeof(Cell)); // nil clear
+      x->header = header;
+      return x;
+    }
+    free = free->next;
+  }
+  return nil;
+}
+
 static Obj allocate(LeVM* vm, Cell cells, Cell header) {
   Cell actual = cells + OBJECT_HEADER_CELLS;
 
-  // TODO GC
-  // TODO Get from free list
+  Obj found = searchFreeList(vm, cells, header);
+  if (found != nil) return found;
+
+  // ----- claim new object -----
+  
+  vm->objCount++;
+  if (vm->objCount > vm->nextGC) {
+    runGC(vm);
+    vm->nextGC *= 2;
+  }
 
   Obj obj = calloc(sizeof(Cell), actual); // nil cleared
+  if (obj == nil) {
+    runGC(vm);
+    // allocate from free list or die
+    found = searchFreeList(vm, cells, header);
+    if (found != nil) return found;
+    if (obj == nil) DIE("Memory exhausted");
+  }
+  
   if (vm->addrMax == 0 || vm->addrMax < obj) vm->addrMax = obj;
   if (vm->addrMin == 0 || vm->addrMin > obj) vm->addrMin = obj;
   obj->header = header;
-  vm->objCount++;
-  pushObj(vm, obj);
+  pushObj(vm, obj, cells);
   
   return obj;
 }
@@ -765,6 +811,8 @@ static LeObj* allocBytesObj(LeVM* vm, int type, int bytes) {
 static void setupConservativeGC(LeVM* vm) {
   vm->objTable = calloc(sizeof(Link), OBJTABLE_LEN);
   vm->objTableLen = OBJTABLE_LEN;
+  vm->objCount = 0;
+  vm->nextGC = OBJTABLE_LEN;
 }
 
 
