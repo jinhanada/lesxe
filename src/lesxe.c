@@ -154,6 +154,7 @@ struct LeVM {
   Link     freeList;
   LeObj*   addrMax;
   LeObj*   addrMin;
+  void*    stackStart;
   // Interpreter
   LeObj* root;
   LeObj* env;
@@ -664,7 +665,7 @@ static void markObj(LeVM* vm, Obj p) {
   }
 }
 
-static Obj getRealObj(LeVM* vm, Cell hash) {
+static Link getLink(LeVM* vm, Cell hash) {
   int len = vm->objTableLen;
   int index = hash % len;
   Link link = vm->objTable[index];
@@ -672,7 +673,7 @@ static Obj getRealObj(LeVM* vm, Cell hash) {
   if (link == nil) return nil;
   
   while (link) {
-    if (link->hash = hash) return link->obj;
+    if (link->hash = hash) return link;
     link = link->next;
   }
   
@@ -685,7 +686,7 @@ static void markConservative(LeVM* vm, Obj p) {
   if (vm->addrMin != 0 && vm->addrMin > p) return; // out of range
 
   Cell hash = conservativeHash(p);
-  Obj x = getRealObj(vm, hash);
+  Obj x = getLink(vm, hash)->obj;
   if (x == nil) return; // no real obj
   markObj(vm, x);
 }
@@ -712,11 +713,40 @@ static void markStack(LeVM* vm, void* start) {
 }
 
 static void markAll(LeVM* vm) {
-  DIE("TODO");
+  if (vm->stackStart == nil) DIE("Set stackStart!");
+  markStack(vm, vm->stackStart);
+  //TODO markRoot
+}
+
+static void sweepLink(LeVM* vm, Link link) {
+  while (link != nil) {
+    Obj x = link->obj;
+    Cell header = x->header;
+    
+    if (isMarked(header)) {
+      x->header = unmarkedHeader(header);
+      link = link->next;
+      continue;
+    }
+
+    // unmarked, push to free list
+    Link free = link;
+    link = link->next;
+    free->next = vm->freeList;
+    vm->freeList = free;
+  }
 }
 
 static void sweepAll(LeVM* vm) {
-  DIE("TODO");
+  // unmark and collect
+  vm->freeList = nil;
+  
+  Cell len = vm->objTableLen;
+  for (int i = 0; i < len; i++) {
+    Link link = vm->objTable[i];
+    if (link == nil) continue;
+    sweepLink(vm, link);
+  }
 }
 
 static void runGC(LeVM* vm) {
@@ -740,6 +770,7 @@ static void pushObj(LeVM* vm, Obj x, Cell cells) {
 }
 
 static Obj searchFreeList(LeVM* vm, Cell cells, Cell header) {
+  //TODO: separate list by 2^n
   Link free = vm->freeList;
   while (free) {
     if (free->cells >= cells) {
@@ -755,6 +786,8 @@ static Obj searchFreeList(LeVM* vm, Cell cells, Cell header) {
 }
 
 static Obj allocate(LeVM* vm, Cell cells, Cell header) {
+  //TODO: make allocated cells fit 2^n
+  
   Cell actual = cells + OBJECT_HEADER_CELLS;
 
   Obj found = searchFreeList(vm, cells, header);
@@ -804,6 +837,17 @@ static LeObj* allocBytesObj(LeVM* vm, int type, int bytes) {
   return b;
 }
 
+// ===== for debug =====
+
+static int countFree(LeVM* vm) {
+  Link free = vm->freeList;
+  int n = 0;
+  while(free != nil) {
+    n++;
+    free = free->next;
+  }
+  return n;
+}
 
 // ===== setup =====
 
@@ -1239,6 +1283,7 @@ static void setGlobal(LeVM* vm, Obj var, Obj val) {
 // ===== Create VM =====
 
 Public LeVM* le_new_vm(int cells, int repl_buf_size) {
+  //TODO get stackStart!
   LeVM* vm = calloc(sizeof(LeVM), 1);
 
   vm->replBufSize = repl_buf_size;

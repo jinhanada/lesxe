@@ -288,10 +288,13 @@ void test_gc_integration() {
 
 // ===== Conservative GC Test =====
 
-void test_aux_mark_stack(LeVM* vm, void* start) {
-  assert(vm->addrMax == nil);
-  assert(vm->addrMin == nil);
-  
+void test_aux_mark_stack0(LeVM* vm) {
+  // allocated but freed
+  Obj x = allocObj(vm, T_ARRAY, 2);
+  Obj y = allocObj(vm, T_ARRAY, 2);
+}
+
+void test_aux_mark_stack1(LeVM* vm) {
   Obj x = allocObj(vm, T_ARRAY, 2);
   Obj y = allocObj(vm, T_ARRAY, 2);
   Obj n = le_int2obj(42);
@@ -304,15 +307,32 @@ void test_aux_mark_stack(LeVM* vm, void* start) {
   x->Array.data[1] = n; 
   y->Array.data[0] = n;
   y->Array.data[1] = x; // mutual recursion
-  markStack(vm, start);
-  assert(isMarked(x->header));
-  assert(isMarked(y->header));
+
+  // run GC
+  runGC(vm);
+  assert(!isMarked(x->header));
+  assert(!isMarked(y->header));
+  assert(x->Array.data[0] == y);
+  assert(x->Array.data[1] == n);
+  assert(y->Array.data[0] == n);
+  assert(y->Array.data[1] == x);
 }
 
 void test_mark_stack(LeVM* vm) {
   void* start;
-  test_aux_mark_stack(vm, &start);
+  vm->stackStart = &start;
+  
+  assert(vm->addrMax == nil);
+  assert(vm->addrMin == nil);  
+
+  test_aux_mark_stack0(vm);
+  test_aux_mark_stack1(vm);
+  
+  assert(vm->addrMax != nil);
+  assert(vm->addrMin != nil);    
+  assert(countFree(vm) == 2);
 }
+
 
 // Macros for VM test
 // =====================================
