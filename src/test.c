@@ -288,12 +288,17 @@ void test_gc_integration() {
 
 // ===== Conservative GC Test =====
 
-void test_aux_traverse_stack(LeVM* vm, void* start) {
+void test_aux_mark_stack(LeVM* vm, void* start) {
+  assert(vm->addrMax == nil);
+  assert(vm->addrMin == nil);
+  
   Obj x = allocObj(vm, T_ARRAY, 2);
   Obj y = allocObj(vm, T_ARRAY, 2);
   Obj n = le_int2obj(42);
   assert(!isMarked(x->header));
   assert(!isMarked(y->header));
+  assert(vm->addrMax != nil);
+  assert(vm->addrMin != nil);
 
   x->Array.data[0] = y;
   x->Array.data[1] = n; 
@@ -304,9 +309,9 @@ void test_aux_traverse_stack(LeVM* vm, void* start) {
   assert(isMarked(y->header));
 }
 
-void test_traverse_stack(LeVM* vm) {
+void test_mark_stack(LeVM* vm) {
   void* start;
-  test_aux_traverse_stack(vm, &start);
+  test_aux_mark_stack(vm, &start);
 }
 
 // Macros for VM test
@@ -773,7 +778,7 @@ void test_all() {
   test(gc_move);
   test(gc_integration);
   // Conservative GC
-  testVM(traverse_stack);
+  testVM(mark_stack);
   // Read
   testVM(read_sxp);
   // Object

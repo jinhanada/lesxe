@@ -150,6 +150,8 @@ struct LeVM {
   int      objTableLen;
   intptr_t objCount;
   Link     freeList;
+  LeObj*   addrMax;
+  LeObj*   addrMin;
   // Interpreter
   LeObj* root;
   LeObj* env;
@@ -677,6 +679,8 @@ static Obj getRealObj(LeVM* vm, Cell hash) {
 
 static void markConservative(LeVM* vm, Obj p) {
   if (!le_is_obj(p)) return;
+  if (vm->addrMax != 0 && vm->addrMax < p) return; // out of range
+  if (vm->addrMin != 0 && vm->addrMin > p) return; // out of range
 
   Cell hash = conservativeHash(p);
   Obj x = getRealObj(vm, hash);
@@ -726,6 +730,8 @@ static Obj allocate(LeVM* vm, Cell cells, Cell header) {
   // TODO Get from free list
 
   Obj obj = calloc(sizeof(Cell), actual); // nil cleared
+  if (vm->addrMax == 0 || vm->addrMax < obj) vm->addrMax = obj;
+  if (vm->addrMin == 0 || vm->addrMin > obj) vm->addrMin = obj;
   obj->header = header;
   vm->objCount++;
   pushObj(vm, obj);
