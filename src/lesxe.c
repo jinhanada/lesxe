@@ -131,6 +131,8 @@ typedef struct ObjLink {
   struct ObjLink* next;
 } ObjLink;
 
+typedef ObjLink* Link;
+
 struct LeVM {
   // parser
   char* src;
@@ -144,9 +146,10 @@ struct LeVM {
   LeObj**  tmp;     // save temporary object from GC
   int      tp;      // temporary stack pointer
   // ConservativeGC
-  ObjLink** objTable;
-  int       objTableLen;
-  intptr_t  objCount;
+  Link*    objTable;
+  int      objTableLen;
+  intptr_t objCount;
+  Link     freeList;
   // Interpreter
   LeObj* root;
   LeObj* env;
@@ -660,7 +663,7 @@ static void markObj(LeVM* vm, Obj p) {
 static Obj getRealObj(LeVM* vm, Cell hash) {
   int len = vm->objTableLen;
   int index = hash % len;
-  ObjLink* link = vm->objTable[index];
+  Link link = vm->objTable[index];
   
   if (link == nil) return nil;
   
@@ -696,7 +699,7 @@ static void markStack(LeVM* vm, void* start) {
   }
 
   for (void* p = top; p >= bottom; p = ((Byte*)p) - sizeof(void*)) {
-    assert((Cell)p == align((Cell)p));
+    // assert((Cell)p == align((Cell)p));
     Obj x = *(Obj*)p;
     markConservative(vm, x);
   }
@@ -709,7 +712,7 @@ static void pushObj(LeVM* vm, Obj x) {
   int len = vm->objTableLen;
   Cell index = hash % len;
   
-  ObjLink* link = calloc(sizeof(ObjLink), 1);
+  Link link = calloc(sizeof(ObjLink), 1);
   link->hash = hash;
   link->obj = x;
   link->next = vm->objTable[index];
@@ -720,6 +723,7 @@ static Obj allocate(LeVM* vm, Cell cells, Cell header) {
   Cell actual = cells + OBJECT_HEADER_CELLS;
 
   // TODO GC
+  // TODO Get from free list
 
   Obj obj = calloc(sizeof(Cell), actual); // nil cleared
   obj->header = header;
@@ -729,8 +733,15 @@ static Obj allocate(LeVM* vm, Cell cells, Cell header) {
   return obj;
 }
 
+static Cell createHeader(Cell cells, int type) {
+  Cell header = 0; // clean
+  header = setType(header, type);
+  header = setCells(header, cells);
+  return header;
+}
+
 static Obj allocObj(LeVM* vm, int type, Cell cells) {
-  Cell header = makeHeader(cells, type);
+  Cell header = createHeader(cells, type);
   return allocate(vm, cells, header);
 }
 
@@ -746,7 +757,7 @@ static LeObj* allocBytesObj(LeVM* vm, int type, int bytes) {
 
 #define OBJTABLE_LEN 257
 static void setupConservativeGC(LeVM* vm) {
-  vm->objTable = calloc(sizeof(ObjLink*), OBJTABLE_LEN);
+  vm->objTable = calloc(sizeof(Link), OBJTABLE_LEN);
   vm->objTableLen = OBJTABLE_LEN;
 }
 
