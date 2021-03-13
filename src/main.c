@@ -96,8 +96,6 @@ void run_repl(Options* opts, LeVM* vm) {
     if (opts->development) {
       printf("!!DEVELOPMENT MODE!!\n");
     }
-    int cells = le_vm_cells(vm);
-    printf("vm cells: %d (%ld MiB)\n", cells, cells * sizeof(void*) / 1024 / 1024);
     printf("Ctrl-D to exit!\n");
   }
 
@@ -150,7 +148,7 @@ int handle_opts(Options* opts, LeVM* vm, int argc, char* argv[]) {
 // ===== Entrypoint =====
 
 int main(int argc, char** argv) {
-  LeVM* vm = le_create_vm();
+  LeVM* vm = le_create_vm(&argc);
 
   Options opts = { .development = 0, .quiet = 0, .sources = NULL };
 

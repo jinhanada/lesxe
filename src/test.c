@@ -1,7 +1,6 @@
 #include "lesxe.c"
 
 #define TEST_CORELIB_FILE "./src/core.le"
-#define VM_CELLS 10000
 
 void test_align() {
   int s = sizeof(Cell);
@@ -42,15 +41,13 @@ void test_object_header() {
   size = ((uintptr_t)size) >> HEADER_CELLS_BIT;
   assert(size > 0);
 
-  Cell header = makeHeader(size, T_ARRAY);
+  Cell header = createHeader(size, T_ARRAY);
   assert(!isBytes(header) && typeOf(header) == T_ARRAY);
   assert(size == cellsOf(header));
 
 
-  // moved
-  assert(!isMoved(header));
-  assert(isMoved((Cell)&header));
-
+  // marked
+  assert(!isMarked(header));
 
   // set type
   Cell h; // header
@@ -65,224 +62,6 @@ void test_object_header() {
   // set cells
   h = setCells(h, 1);    assert(cellsOf(h) == 1);
   h = setCells(h, size); assert(cellsOf(h) == size);
-}
-
-
-void test_memory() {
-  int cells = 10000;
-  LeVM* vm = le_new_vm(VM_CELLS, 0);
-  assert(vm->cells == cells);
-  assert(vm->new != vm->old);
-  assert(vm->new <= vm->here && vm->here < vm->new + cells);
-  le_free_vm(vm);
-}
-
-
-void test_allot_object() {
-  LeVM* vm  = le_new_vm(VM_CELLS, 0);
-  Obj  o   = newObj(vm, 3, T_ARRAY);
-  Obj  n42 = le_int2obj(42);
-
-  assert(cellsOf(o->header) == 3);
-  assert(typeOf(o->header)  == T_ARRAY);
-
-  o->Array.data[0] = n42;
-  o->Array.data[1] = n42;
-  o->Array.data[2] = n42;
-  assert(o->Array.data[0] == n42);
-  assert(o->Array.data[1] == n42);
-  assert(o->Array.data[2] == n42);
-
-  le_free_vm(vm);
-}
-
-
-void test_bytes_object() {
-  LeVM* vm = le_new_vm(VM_CELLS, 0);
-  Obj b = newBytesObj(vm, 3, T_BYTES);
-
-  assert(cellsOf(b->header) == 2);
-  assert(typeOf(b->header)  == T_BYTES);
-  assert(b->Bytes.size == 3);
-
-  // CellArrayではなくByteArrayとして書き込めているか
-  /* byte array? */ assert(&(b->Bytes.data[1]) - &(b->Bytes.data[0]) == 1);
-  b->Bytes.data[0] = 42;
-  b->Bytes.data[1] = 42;
-  b->Bytes.data[2] = 42;
-  assert(b->Bytes.data[0] == 42);
-  assert(b->Bytes.data[1] == 42);
-  assert(b->Bytes.data[2] == 42);
-  /* padded & zero cleared? */ assert(b->Bytes.data[3] == 0);
-
-  le_free_vm(vm);
-}
-
-
-void test_temporary_stack() {
-  LeVM* vm = le_new_vm(VM_CELLS, 0);
-
-  Obj n42 = le_int2obj(42);
-  Obj* stack = vm->tmp; // スタックのアドレスを書き換えてしまうバグ検出用
-
-  Obj o = newObj(vm, 1, T_ARRAY);
-  o->Array.data[0] = n42;
-  Push(o);
-
-  Obj p = Pop();
-  assert(p == o);
-  assert(p->Array.data[0] == n42);
-
-  assert(vm->tmp == stack);
-
-  // 目視でアンダーフローエラー確認
-  // Pop(mem);
-
-  le_free_vm(vm);
-}
-
-void test_gc_swap() {
-  LeVM* vm = le_new_vm(VM_CELLS, 0);
-  Obj* new = vm->new;
-  Obj* old = vm->old;
-
-  memSwap(vm);
-
-  assert(new != vm->new);
-  assert(old != vm->old);
-
-  le_free_vm(vm);
-}
-
-void test_gc_move() {
-  LeVM* vm = le_new_vm(VM_CELLS, 0);
-  Obj n42 = le_int2obj(42);
-
-  Obj o = newObj(vm, 1, T_ARRAY);
-  o->Array.data[0] = n42;
-
-  memSwap(vm);
-  assert(vm->here == vm->new);
-
-  // not obj
-  assert(memMove(vm, nil) == nil);
-  assert(memMove(vm, n42) == n42);
-
-  // obj
-  Obj o2 = memMove(vm, o);
-  assert(o2 == (Obj)vm->new); // first of new area
-  assert(vm->here != vm->new);  // here-pointer has been moved
-  assert(memforwarded(o) == o2); 
-
-  le_free_vm(vm);
-}
-
-void test_gc_integration() {
-  Obj n42 = le_int2obj(42);
-  Obj n43 = le_int2obj(43);
-
-  // check scanning root
-  { 
-    LeVM* vm = le_new_vm(VM_CELLS, 0);
-    Obj *r = vm->root->Array.data;
-    vm->root->Array.data[0] = n42;
-    Obj obj = newObj(vm, 1, T_ARRAY);
-    vm->root->Array.data[1] = obj;
-    obj->Array.data[0] = n43;
-    Obj root = vm->root;
-
-    // before
-    le_gc(vm);
-    // after
-
-    // root
-    assert(vm->root != root);
-    assert(root->header == (Cell)vm->root);
-    assert(vm->root->Array.data[0] == n42);
-    root = vm->root;
-
-    // child
-    assert(obj != root->Array.data[1]);
-    assert(obj->header == (Cell)root->Array.data[1]);
-    obj = root->Array.data[1];
-    assert(obj->Array.data[0] == n43);
-
-    le_free_vm(vm);
-  }
-
-  // check cyclic test
-  {
-    LeVM* vm = le_new_vm(VM_CELLS, 0);
-    Obj root = vm->root;
-    Obj obj1 = newObj(vm, 1, T_ARRAY);
-    Obj obj2 = newObj(vm, 1, T_ARRAY);
-
-    // cyclic references
-    vm->root->Array.data[0] = obj1;
-    obj1->Array.data[0] = obj2;
-    obj2->Array.data[0] = vm->root;
-
-    le_gc(vm);
-
-    // root scanned?
-    assert(vm->root->Array.data[0] != obj1);
-    assert(obj1->header == (Cell)vm->root->Array.data[0]);
-    obj1 = vm->root->Array.data[0];
-
-    // obj1 scanned?
-    assert(obj1->Array.data[0] != obj2);
-    assert(obj2->header == (Cell)obj1->Array.data[0]);
-    obj2 = obj1->Array.data[0];
-
-    // obj2 scanned?
-    assert(obj2->Array.data[0] != root);
-    assert(root->header == (Cell)obj2->Array.data[0]);
-
-    le_free_vm(vm);
-  }
-
-  // temporary stack
-  {
-    LeVM* vm = le_new_vm(VM_CELLS, 0);
-    Obj obj1 = newObj(vm, 1, T_ARRAY);
-    Obj obj2 = newObj(vm, 1, T_ARRAY);
-    Obj obj3 = newObj(vm, 1, T_ARRAY);
-    Cell obj3_header = obj3->header;
-
-    Push(obj1);
-    obj1->Array.data[0] = obj2;
-    obj2->Array.data[0] = n42;
-    // obj3 is going to be deleted
-
-    le_gc(vm);
-
-    Obj moved = Pop();
-    assert(obj1->header == (Cell)moved);
-    assert(obj2->header == (Cell)moved->Array.data[0]);
-    obj2 = moved->Array.data[0];
-    assert(obj2->Array.data[0] == n42);
-    assert(obj3_header == obj3_header); // not moved
-
-    le_free_vm(vm);
-  }
-
-  // byte object
-  {
-    LeVM* vm = le_new_vm(VM_CELLS, 0);
-    LeObj* b = newBytesObj(vm, 2, T_BYTES);
-    b->Bytes.data[0] = 42;
-    b->Bytes.data[1] = 43;
-    vm->root->Array.data[0] = b;
-
-    le_gc(vm);
-
-    assert(b->header == (Cell)vm->root->Array.data[0]);
-    b = (vm->root->Array.data[0]);
-    assert(b->Bytes.data[0] == 42);
-    assert(b->Bytes.data[1] == 43);
-
-    le_free_vm(vm);
-  }
 }
 
 
@@ -309,7 +88,7 @@ void test_aux_mark_stack1(LeVM* vm) {
   y->Array.data[1] = x; // mutual recursion
 
   // run GC
-  runGC(vm);
+  le_gc(vm);
   assert(!isMarked(x->header));
   assert(!isMarked(y->header));
   assert(x->Array.data[0] == y);
@@ -322,14 +101,8 @@ void test_mark_stack(LeVM* vm) {
   void* start;
   vm->stackStart = &start;
   
-  assert(vm->addrMax == nil);
-  assert(vm->addrMin == nil);  
-
   test_aux_mark_stack0(vm);
   test_aux_mark_stack1(vm);
-  
-  assert(vm->addrMax != nil);
-  assert(vm->addrMin != nil);    
   assert(countFree(vm) == 2);
 }
 
@@ -395,7 +168,7 @@ void test_hash(LeVM* vm) {
   Obj t = Sym(True);
   Obj hash = le_get_hash(t);
   le_gc(vm); // change address
-  assert(t != Sym(True)); // different address
+  assert(t == Sym(True)); // same address
   assert(le_get_hash(Sym(True)) == hash); // same hash
 
   // string
@@ -777,8 +550,9 @@ void test_prim_raise(LeVM* vm) {
 
 #define test(Name) { printf("%-30s ", #Name); test_##Name(); printf("ok\n"); }
 #define testVM(Name) {                          \
+    void* here;                                 \
     printf("%-30s ", #Name);                    \
-    LeVM* vm = le_create_vm();                  \
+    LeVM* vm = le_create_vm(&here);             \
     test_##Name(vm);                            \
     le_free_vm(vm);                             \
     printf("ok\n");                             \
@@ -789,14 +563,6 @@ void test_all() {
   test(align);
   test(tagged_pointer);
   test(object_header);
-  // Copying GC
-  test(memory);
-  test(allot_object);
-  test(bytes_object);
-  test(temporary_stack);
-  test(gc_swap);
-  test(gc_move);
-  test(gc_integration);
   // Conservative GC
   testVM(mark_stack);
   // Read

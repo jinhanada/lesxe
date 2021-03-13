@@ -52,20 +52,13 @@ int le_is_string(LeObj* p);
 
 LeObj* le_get_hash(LeObj* x);
 
-int le_vm_cells(LeVM* vm);
 LeObj* le_vm_result(LeVM* vm);
 LeObj* le_vm_error(LeVM* vm);
 
 
-// Memory, GC, and Temporary Stack
+// GC
 // =============================================================================
 void   le_gc(LeVM* vm);
-int    le_push(LeVM* vm, LeObj* obj);
-LeObj* le_pop(LeVM* vm);
-LeObj* le_stack_at(LeVM* vm, int i);
-int    le_stack_index(LeVM* vm);
-void   le_set_stack(LeVM* vm, int i, LeObj* x);
-void   le_restore_stack(LeVM* vm, int index);
 
 
 // Data Types
@@ -101,7 +94,7 @@ LeObj* le_new_func(LeVM* vm, LeObj* code, LeObj* env, LeObj* params);
 
 // VM
 // =============================================================================
-LeVM* le_new_vm(int cells, int repl_buf_size);
+LeVM* le_new_vm(void* start, int repl_buf_size);
 LeVM* le_create_vm();
 void  le_free_vm(LeVM* vm);
 

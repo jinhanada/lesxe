@@ -129,7 +129,8 @@ typedef struct ObjLink {
   intptr_t hash;
   intptr_t cells; // for searching free list
   LeObj*   obj;
-  struct ObjLink* next;
+  struct ObjLink* next; // object table
+  struct ObjLink* free; // free list
 } ObjLink;
 
 typedef ObjLink* Link;
@@ -138,15 +139,7 @@ struct LeVM {
   // parser
   char* src;
   char* p;
-  // Memory
-  intptr_t cells;
-  LeObj**  new;
-  LeObj**  old;
-  LeObj**  here;
-  LeObj**  scanned;
-  LeObj**  tmp;     // save temporary object from GC
-  int      tp;      // temporary stack pointer
-  // ConservativeGC
+  // Object Memory
   Link*    objTable;
   int      objTableLen;
   intptr_t objCount;
@@ -174,13 +167,6 @@ struct LeVM {
 typedef intptr_t Cell;
 typedef uint8_t  Byte;
 #define Public
-#define Push(x)                le_push((vm), (x))
-#define Pop()                  le_pop(vm)
-#define Get(i)                 le_stack_at(vm, i)
-#define Set(i, x)              le_set_stack(vm, i, x)
-#define SaveStack              int _tp = le_stack_index(vm)
-#define RestoreStack           le_restore_stack(vm, _tp)
-#define RestoreReturn(code)    { RestoreStack; return code; }
 #define Cons(vm, a, b)         le_cons((vm), (a), (b))
 #define Car(x)                 le_car(x)
 #define Cdr(x)                 le_cdr(x)
@@ -351,17 +337,6 @@ static Cell cellsOf(Cell header) {
   return (Cell)(((uintptr_t)header) >> HEADER_CELLS_BIT);
 }
 
-static int isMoved(Cell header) {
-  return !(header & 0x01);
-}
-
-static Cell makeHeader(Cell cells, int type) {
-  Cell header = 0x01; // 最下位1bitが0ならmoved
-  header = setType(header, type);
-  header = setCells(header, cells);
-  return header;
-}
-
 
 // ===== type checkers =====
 
@@ -450,197 +425,17 @@ Public Obj le_get_hash(Obj obj) {
 }
 
 
-// ===== Temporary stack =====
-
-Public int le_push(LeVM* vm, Obj obj) {
-  if (vm->tp >= TEMPORARY_STACK_SIZE)
-    DIE("temporary stack overflow");
-  int i = vm->tp;
-  vm->tmp[i] = obj;
-  vm->tp++;
-  return i;
-}
-
-Public Obj le_pop(LeVM* vm) {
-  if (vm->tp <= 0)
-    DIE("temporary stack underflow");
-  vm->tp--;
-  return vm->tmp[vm->tp];
-}
-
-Public Obj le_stack_at(LeVM* vm, int i) {
-  return vm->tmp[i];
-}
-
-Public int le_stack_index(LeVM* vm) {
-  return vm->tp;
-}
-
-Public void le_set_stack(LeVM* vm, int i, Obj x) {
-  vm->tmp[i] = x;
-}
-
-Public void le_restore_stack(LeVM* vm, int index) {
-  vm->tp = index;
-}
-
-
-// ===== For debug GC =====
-
-static int objInNew(LeVM* vm, Obj obj) {
-  return vm->new[0] <= obj && obj < vm->new[vm->cells];
-}
-
-static void assertAlive(LeVM* vm, Obj x) {
-  if (!le_is_obj(x) || objInNew(vm, x)) return;
-  DIE("old obj %p", x);
-}
-
-static void assertAllAlive(LeVM* vm) {
-  vm->scanned = vm->new;
-  while (vm->scanned < vm->here) {
-    Obj  obj    = (Obj)vm->scanned;
-    Cell cells  = cellsOf(obj->header);
-    Cell actual = cells + OBJECT_HEADER_CELLS;
-    vm->scanned += actual;
-
-    // no need to check
-    if (isBytes(obj->header)) continue;
-
-    // check
-    for (int i = 0; i < cells; i++) {
-      assertAlive(vm, obj->Array.data[i]);
-    }
-  }
-}
-
-
-// ===== GC routines =====
-
-static void memSwap(LeVM* vm) {
-  vm->here = vm->old;
-  vm->old  = vm->new;
-  vm->new  = vm->here;
-}
-
-static Obj memforwarded(Obj obj) {
-  assert(isMoved(obj->header));
-  return (Obj)(obj->header);
-}
-
-static Obj memMove(LeVM* vm, Obj obj) {
-  if (!le_is_obj(obj)) return obj;
-  if (isMoved(obj->header)) return (Obj)obj->header;
-
-  Cell cells  = cellsOf(obj->header);
-  Cell actual = cells + OBJECT_HEADER_CELLS;
-  Obj  src    = obj;
-  Obj  dst    = (Obj)vm->here;
-  vm->here += actual;
-  
-  for (int i = 0; i < actual; i++) {
-    dst[i] = src[i];
-  }
-
-  obj->header = (Cell)dst;
-
-  return dst;
-}
-
-
-// ===== GC entry point =====
-
-Public void le_gc(LeVM* vm) {
-  if (!vm->root) DIE("GC: no root");
-  memSwap(vm);
-
-  // move root
-  vm->root = memMove(vm, vm->root);
-
-  // move temporary stack
-  for (int i = 0; i < vm->tp; i++) {
-    vm->tmp[i] = memMove(vm, vm->tmp[i]);
-  }
-
-  // interpreter
-  vm->env       = memMove(vm, vm->env);
-  vm->result    = memMove(vm, vm->result);
-  vm->err       = memMove(vm, vm->err);
-
-  // Symbol Table
-  for (int i = 0; i < SymTableSize; i++) {
-    vm->symTable[i] = memMove(vm, vm->symTable[i]);
-  }
-
-  // scan loop
-  vm->scanned = vm->new;
-  while (vm->scanned < vm->here) {
-    Obj  obj    = (Obj)vm->scanned;
-    Cell cells  = cellsOf(obj->header);
-    Cell actual = cells + OBJECT_HEADER_CELLS;
-    vm->scanned += actual;
-
-    // no need to scan
-    if (isBytes(obj->header)) continue;
-
-    // move contents
-    for (int i = 0; i < cells; i++) {
-      Obj x = obj->Array.data[i];
-      obj->Array.data[i] = memMove(vm, obj->Array.data[i]);
-    }
-  }
-}
-
-
-// ===== Allot =====
-
-static int memClaim(LeVM* vm, Cell cells) {
-  // return 1 if there is not enough memory
-  Obj* max  = vm->new + vm->cells;
-  Cell diff = max - vm->here; // by cells
-  return diff <= cells;
-}
-
-static Obj memAllot(LeVM* vm, Cell cells, Cell header) {
-  Cell actual = cells + OBJECT_HEADER_CELLS;
-
-  if (memClaim(vm, actual)) {
-    le_gc(vm);
-    if (memClaim(vm, actual)) DIE("LeVM: memory exhausted");
-  }
-
-  Obj obj = (Obj)vm->here;
-  vm->here += actual;
-  obj->header = header;
-  obj->hash = nil;
-  memset(&(obj->Array.data), nil, cells * sizeof(Cell)); // nil clear
-  return obj;
-}
-
-static Obj newObj(LeVM* vm, Cell cells, int type) {
-  Cell header = makeHeader(cells, type);
-  return memAllot(vm, cells, header);
-}
-
-static LeObj* newBytesObj(LeVM* vm, int bytes, int type) {
-  Cell cells = align(bytes) / sizeof(Cell) + 1; // size cell
-  Obj b = newObj(vm, cells, type);
-  b->Bytes.size = bytes;
-  return b;
-}
-
-
 // Conservative GC
 // =============================================================================
 
 // ===== for debug/testing =====
 
 static int countFree(LeVM* vm) {
-  Link free = vm->freeList;
+  Link link = vm->freeList;
   int n = 0;
-  while(free != nil) {
+  while(link != nil) {
     n++;
-    free = free->next;
+    link = link->free;
   }
   return n;
 }
@@ -713,7 +508,7 @@ static void markConservative(LeVM* vm, Obj p) {
 static void markStack(LeVM* vm, void* start) {
   void *top, *bottom;
   int delta;
-  
+
   if (start < (void*)&top) {
     // stack grows toward higher addr
     top    = &top;
@@ -734,7 +529,10 @@ static void markStack(LeVM* vm, void* start) {
 static void markAll(LeVM* vm) {
   if (vm->stackStart == nil) DIE("Set stackStart!");
   markStack(vm, vm->stackStart);
-  //TODO markRoot
+  markObj(vm, vm->root);
+  markObj(vm, vm->env);
+  markObj(vm, vm->result);
+  markObj(vm, vm->err);
 }
 
 static void sweepLink(LeVM* vm, Link link) {
@@ -749,10 +547,9 @@ static void sweepLink(LeVM* vm, Link link) {
     }
 
     // unmarked, push to free list
-    Link free = link;
+    link->free = vm->freeList;
+    vm->freeList = link;
     link = link->next;
-    free->next = vm->freeList;
-    vm->freeList = free;
   }
 }
 
@@ -768,9 +565,10 @@ static void sweepAll(LeVM* vm) {
   }
 }
 
-static void runGC(LeVM* vm) {
-  DBG("gc start");
+Public void le_gc(LeVM* vm) {
+  DBG("gc mark");
   markAll(vm);
+  DBG("   sweep");
   sweepAll(vm);
   DBG("done free(%d) objs(%ld)", countFree(vm), vm->objCount);
 }
@@ -789,20 +587,31 @@ static void pushObj(LeVM* vm, Obj x, Cell cells) {
   link->obj = x;
   link->next = vm->objTable[index];
   vm->objTable[index] = link;
+  vm->objCount++;
 }
 
 static Obj searchFreeList(LeVM* vm, Cell cells, Cell header) {
   //TODO: separate list by 2^n
-  Link free = vm->freeList;
-  while (free) {
-    if (free->cells >= cells) {
-      Obj x = free->obj;
-      Cell realCells = free->cells;
+  Link link = vm->freeList;
+  Link before = nil;
+  while (link != nil) {
+    // found
+    if (link->cells >= cells) {
+      Obj x = link->obj;
+      Cell realCells = link->cells;
       memset(&(x->Array.data), nil, realCells * sizeof(Cell)); // nil clear
       x->header = header;
+      // reconnect link
+      if (before == nil) {
+        vm->freeList = link->free;
+      } else {
+        before->free = link->free;
+      }
       return x;
     }
-    free = free->next;
+    // next
+    before = link;
+    link = link->free;
   }
   return nil;
 }
@@ -817,15 +626,14 @@ static Obj allocate(LeVM* vm, Cell cells, Cell header) {
 
   // ----- claim new object -----
   
-  vm->objCount++;
   if (vm->objCount > vm->nextGC) {
-    runGC(vm);
+    le_gc(vm);
     vm->nextGC *= 2;
   }
 
   Obj obj = calloc(sizeof(Cell), actual); // nil cleared
   if (obj == nil) {
-    runGC(vm);
+    le_gc(vm);
     // allocate from free list or die
     found = searchFreeList(vm, cells, header);
     if (found != nil) return found;
@@ -849,25 +657,48 @@ static Cell createHeader(Cell cells, int type) {
 
 static Obj allocObj(LeVM* vm, int type, Cell cells) {
   Cell header = createHeader(cells, type);
-  return allocate(vm, cells, header);
+  Obj x = allocate(vm, cells, header);
+  return x;
 }
 
 static LeObj* allocBytesObj(LeVM* vm, int type, int bytes) {
   Cell cells = align(bytes) / sizeof(Cell) + 1; // size cell
-  Obj b = allocObj(vm, cells, type);
+  Obj b = allocObj(vm, type, cells);
   b->Bytes.size = bytes;
   return b;
+}
+
+// ===== free =====
+
+static void freeObjectLink(LeVM* vm, Link link) {
+  while (link != nil) {
+    Link old = link;
+    link = link->next;
+    free(old->obj);
+    free(old);
+    vm->objCount--;
+    if (vm->objCount < 0) DBG("unbalanced freeObject");
+  }
+}
+
+static void freeAllObjects(LeVM* vm) {
+  Cell len = vm->objTableLen;
+  for (int i = 0; i < len; i++) {
+    freeObjectLink(vm, vm->objTable[i]);
+  }
+  free(vm->objTable);
 }
 
 
 // ===== setup =====
 
-#define OBJTABLE_LEN 257
-static void setupConservativeGC(LeVM* vm) {
+#define OBJTABLE_LEN 65535
+static void setupConservativeGC(LeVM* vm, void* start) {
   vm->objTable = calloc(sizeof(Link), OBJTABLE_LEN);
   vm->objTableLen = OBJTABLE_LEN;
   vm->objCount = 0;
   vm->nextGC = OBJTABLE_LEN;
+  vm->stackStart = start;
 }
 
 
@@ -879,14 +710,14 @@ static void setupConservativeGC(LeVM* vm) {
 #define ROOT_SIZE OBJ_SIZE(Root)
 
 static Obj newRoot(LeVM* vm) {
-  return newObj(vm, ROOT_SIZE, T_ARRAY);
+  return allocObj(vm, T_ARRAY, ROOT_SIZE);
 }
 
 
 // ===== Array =====
 
 Public Obj le_new_array(LeVM* vm, int len) {
-  return newObj(vm, len, T_ARRAY);
+  return allocObj(vm, T_ARRAY, len);
 }
 
 Public int le_array_len(Obj xs) {
@@ -896,12 +727,10 @@ Public int le_array_len(Obj xs) {
 
 // ===== Pair =====
 
-Public Obj le_cons(LeVM* vm, Obj a, Obj b) {
-  Push(b);
-  Push(a);
-  Obj xs = newObj(vm, 2, T_PAIR);
-  xs->Pair.car = Pop();
-  xs->Pair.cdr = Pop();
+Public Obj le_cons(LeVM* vm, Obj car, Obj cdr) {
+  Obj xs = allocObj(vm, T_PAIR, 2);
+  xs->Pair.car = car;
+  xs->Pair.cdr = cdr;
   return xs;
 }
 
@@ -949,7 +778,7 @@ Public Obj le_reverse_inplace(Obj xs) {
 
 Public Obj le_new_str(LeVM* vm, int len) {
   int actual = len+1; // null termination
-  return newBytesObj(vm, actual, T_STRING);
+  return allocBytesObj(vm, T_STRING, actual);
 }
 
 Public Obj le_new_str_from(LeVM* vm, char* str) {
@@ -981,11 +810,9 @@ Public Obj le_str_concat(LeVM* vm, Obj a, Obj b) {
   int len_a = le_str_len(a);
   int len_b = le_str_len(b);
   int len   = len_a + len_b;
-  Push(a);
-  Push(b);
   Obj s = le_new_str(vm, len);
-  char* pb = le_cstr_of(Pop());
-  char* pa = le_cstr_of(Pop());
+  char* pb = le_cstr_of(a);
+  char* pa = le_cstr_of(b);
   char* ps = le_cstr_of(s);
   memcpy(ps,         pa, len_a);
   memcpy(ps + len_a, pb, len_b);
@@ -1004,7 +831,7 @@ Public int le_str_eq(Obj a, Obj b) {
 // ===== Bytes =====
 
 Public Obj le_new_bytes(LeVM* vm, int len) {
-  return newBytesObj(vm, len, T_BYTES);
+  return allocBytesObj(vm, T_BYTES, len);
 }
 
 Public int le_bytes_len(Obj xs) {
@@ -1039,9 +866,8 @@ static void addSym(LeVM* vm, Obj sym) {
 }
 
 static Obj createSym(LeVM* vm, Obj name) {
-  Push(name);
-  Obj sym = newObj(vm, SYM_SIZE, T_SYMBOL);
-  sym->Symbol.name = Pop();
+  Obj sym = allocObj(vm, T_SYMBOL, SYM_SIZE);
+  sym->Symbol.name = name;
   addSym(vm, sym);
   return sym;
 }
@@ -1068,13 +894,10 @@ Public Obj le_new_sym_from(LeVM* vm, char* name) {
 #define FUNC_SIZE OBJ_SIZE(Func)
 
 Public Obj le_new_func(LeVM* vm, Obj code, Obj env, Obj vars) {
-  Push(code);
-  Push(env);
-  Push(vars);
-  Obj c = newObj(vm, FUNC_SIZE, T_FUNC);
-  c->Func.vars = Pop();  
-  c->Func.env  = Pop();
-  c->Func.code = Pop();
+  Obj c = allocObj(vm, T_FUNC, FUNC_SIZE);
+  c->Func.code = code;
+  c->Func.env  = env;
+  c->Func.vars = vars;
   return c;
 }
 
@@ -1248,10 +1071,6 @@ Public char* le_err_str(LeVM* vm) {
 // VM
 // =============================================================================
 
-Public int le_vm_cells(LeVM* vm) {
-  return vm->cells;
-}
-
 Public Obj le_vm_result(LeVM* vm) {
   return vm->result;
 }
@@ -1284,30 +1103,21 @@ static Obj fetchGlobalRef(LeVM* vm, Obj sym) {
 }
 
 static void setGlobal(LeVM* vm, Obj var, Obj val) {
-  Push(val);
   Obj ref = fetchGlobalRef(vm, var);
-  val = Pop();
   SetCar(ref, val);
 }
 
 
 // ===== Create VM =====
 
-Public LeVM* le_new_vm(int cells, int repl_buf_size) {
+Public LeVM* le_new_vm(void* start, int repl_buf_size) {
   //TODO get stackStart!
   LeVM* vm = calloc(sizeof(LeVM), 1);
 
   vm->replBufSize = repl_buf_size;
 
-  // memory
-  vm->cells = cells;
-  vm->new   = calloc(sizeof(Cell), cells);
-  vm->old   = calloc(sizeof(Cell), cells);
-  vm->here  = vm->new;
-  vm->tmp   = calloc(sizeof(Obj), TEMPORARY_STACK_SIZE);
-
   // conservative gc
-  setupConservativeGC(vm);
+  setupConservativeGC(vm, start);
 
   // root
   vm->root = newRoot(vm);
@@ -1317,20 +1127,13 @@ Public LeVM* le_new_vm(int cells, int repl_buf_size) {
   return vm;
 }
 
-Public LeVM* le_create_vm() {
-  return le_new_vm(VM_DEFAULT_CELLS, VM_DEFAULT_REPL_BUF_SIZE);
+Public LeVM* le_create_vm(void* start) {
+  return le_new_vm(start, VM_DEFAULT_REPL_BUF_SIZE);
 }
 
 Public void le_free_vm(LeVM* vm) {
-  // Memory
-  free(vm->new);
-  free(vm->old);
-  free(vm->tmp);
-
   // Conservative GC
-  free(vm->objTable);
-  //TODO: free all allocated objects and check its count
-
+  freeAllObjects(vm);
   free(vm);
 }
 
@@ -1344,9 +1147,8 @@ Public int le_raise(LeVM* vm, Obj err) {
 }
 
 Public int le_raise_with(LeVM* vm, Obj error, Obj x) {
-  Push(error);
   Obj xs = Cons(vm, x, nil);
-  xs = Cons(vm, Pop(), xs);
+  xs = Cons(vm, error, xs);
   Obj sym = Sym(Error);
   xs = Cons(vm, sym, xs);
   return le_raise(vm, xs);
@@ -1354,9 +1156,8 @@ Public int le_raise_with(LeVM* vm, Obj error, Obj x) {
 
 Public int le_raise_str(LeVM* vm, char* msg, Obj x) {
   Obj xs = Cons(vm, x, nil);
-  Push(xs);
   Obj str = le_new_str_from(vm, msg);
-  xs = Cons(vm, str, Pop());
+  xs = Cons(vm, str, xs);
   xs = Cons(vm, Sym(Error), xs);
   return le_raise(vm, xs);
 }
@@ -1457,10 +1258,10 @@ static int readListBody(LeVM* vm) {
   
   int code = readExpr(vm);
   ExpectOK;
-  Push(vm->result);
+  Obj car = vm->result;
   code = readListBody(vm);
   ExpectOK;
-  vm->result = Cons(vm, Pop(), vm->result);
+  vm->result = Cons(vm, car, vm->result);
   
   return Le_OK;
 }
@@ -1483,12 +1284,12 @@ static int readList(LeVM* vm) {
 
   int code = readExpr(vm);
   ExpectOK;
-  Push(vm->result);
+  Obj car = vm->result;
   
   code = readListBody(vm);
   ExpectOK;
   
-  vm->result = Cons(vm, Pop(), vm->result);
+  vm->result = Cons(vm, car, vm->result);
   return Le_OK;
 }
 
@@ -1615,7 +1416,6 @@ static int findLocal(LeVM* vm, Obj env, Obj sym) {
 static int evalExprs(LeVM* vm, Obj xs, Obj* last) {
   // For tail call optimization, last expression won't be
   // evaled and set to &last
-  SaveStack;
   // exprs should be a pair or nil
   int code = Le_OK;
   vm->result = nil;
@@ -1624,11 +1424,9 @@ static int evalExprs(LeVM* vm, Obj xs, Obj* last) {
 
   while (Cdr(xs) != nil) {
     Obj expr = Car(xs);
-    Push(Cdr(xs));
     code = eval(vm, expr);
-    if (code != Le_OK) RestoreReturn(code);
-
-    xs = Pop();
+    if (code != Le_OK) return code;
+    xs = Cdr(xs);
   }
   
   *last = Car(xs); // last expression
@@ -1648,7 +1446,6 @@ static int evalFn(LeVM* vm, Obj rest) {
 }
 
 static int evalArgs(LeVM* vm, Obj args) {
-  SaveStack;
   if (args == nil) {
     vm->result = nil;
     return Le_OK;
@@ -1659,14 +1456,10 @@ static int evalArgs(LeVM* vm, Obj args) {
   Obj vals = nil;
   for (; args; args = Cdr(args)) {
     Obj expr = Car(args);
-    Push(args);
-    Push(vals);
     int code = eval(vm, expr);
-    if (code != Le_OK) RestoreReturn(code);
+    if (code != Le_OK) return code;
     Obj val = vm->result;
-    vals = Pop();
     vals = le_cons(vm, val, vals);
-    args = Pop();
   }
 
   vm->result = le_reverse_inplace(vals);
@@ -1688,20 +1481,16 @@ static void buildFuncEnv(LeVM* vm, Obj func, Obj args) {
   while (vars != nil) {
     // rest
     if (le_is_symbol(vars)) {
-      Push(env);
       Obj bind = le_cons(vm, vars, args);
-      env = le_cons(vm, bind, Pop());
+      env = le_cons(vm, bind, env);
       break;
     }
 
     // single
-    Push(vars);
-    Push(args);
-    Push(env);
     Obj bind = le_cons(vm, Car(vars), Car(args));
-    env = le_cons(vm, bind, Pop());
-    args = Cdr(Pop());
-    vars = Cdr(Pop());
+    env = le_cons(vm, bind, env);
+    args = Cdr(args);
+    vars = Cdr(vars);        
   }
 
   // set
@@ -1710,53 +1499,43 @@ static void buildFuncEnv(LeVM* vm, Obj func, Obj args) {
 
 static int applyFunc(LeVM* vm, Obj func, Obj args) {
   // func should be type checked
-  SaveStack;
   Obj last;
   
   // swap env
-  Push(vm->env);
-  Push(func);
+  Obj outerEnv = vm->env;
   buildFuncEnv(vm, func, args);
-  func = Pop();
 
   // apply
   int code = evalExprs(vm, func->Func.code, &last);
-  if (code != Le_OK) RestoreReturn(code);
+  if (code != Le_OK) return code;
   code = eval(vm, last);
   // result or err is set on vm
   
   // restore env
-  vm->env = Pop();
+  vm->env = outerEnv;
 
   return code;
 }
 
 static int evalDef(LeVM* vm, Obj xs) {
-  SaveStack;
   // xs: (var val)
   Obj var = Car(xs);
   Obj val = Second(xs);
-  Push(var);
   int code = eval(vm, val);
-  if (code != Le_OK) RestoreReturn(code);
+  if (code != Le_OK) return code;
   val = vm->result; // also this is return value
-  var = Pop();
   setGlobal(vm, var, val);
   return Le_OK;
 }
 
 static int evalSet(LeVM* vm, Obj xs) {
-  SaveStack;
   Obj var = Car(xs);
   Obj val = Second(xs);
   ExpectType(symbol, var);
 
   // eval value
-  Push(var);
   int code = eval(vm, val);
-  if (code != Le_OK) RestoreReturn(code);
-  
-  var = Pop();
+  if (code != Le_OK) return code;
 
   // search local
   Obj ref = findLocalRef(vm->env, var);
@@ -1777,27 +1556,19 @@ static int evalSet(LeVM* vm, Obj xs) {
 
 static int evalCatch(LeVM* vm, Obj xs) {
   // (catch expr fn)
-  SaveStack;
   Obj expr = Car(xs);
   Obj f = Second(xs);
-  Push(f);
 
   int code = eval(vm, expr);
-  if (code != Le_ERR) RestoreReturn(code);
+  if (code != Le_ERR) return code;
 
   // raised
-  f = Pop();
-  Push(vm->err);
+  Obj err = vm->err;
   code = eval(vm, f);
-  if (code != Le_OK) RestoreReturn(code);
-  
+  ExpectOK;
   f = vm->result;
   ExpectType(func, vm->result);
-
-  Obj err = Pop();
-  Push(f);
   Obj args = Cons(vm, err, nil);
-  f = Pop();
 
   return applyFunc(vm, f, args);
 }
@@ -1815,7 +1586,6 @@ PrimHandler PrimitiveTable[SymTableSize];
 // ===== Arithmetics =====
 
 #define ARITH_PROLOGUE                                                  \
-  SaveStack;                                                            \
   Obj a = Car(args);                                                    \
   Obj b = Second(args);                                                 \
   if (!le_is_num(a) || !le_is_num(b))                                   \
@@ -1871,7 +1641,6 @@ static int primMod(LeVM* vm, Obj args) {
 // ===== Compare =====
 
 static int primEq(LeVM* vm, Obj args) {
-  SaveStack;
   Obj a = Car(args);
   Obj b = Second(args);
 
@@ -1886,7 +1655,6 @@ static int primNot(LeVM* vm, Obj args) {
 }
 
 static int primGt(LeVM* vm, Obj args) {
-  SaveStack;
   Obj a = Car(args);
   Obj b = Second(args);
 
@@ -2054,26 +1822,23 @@ static int primStrEq(LeVM* vm, Obj args) {
 
 static int primStrCat(LeVM* vm, Obj args) {
   // (%prim:str-cat ListOfStrings) => String
-  SaveStack;
   Obj xs = Car(args);
-  Push(xs);
   int size = 0;
 
   // アロケーションとコピー何度もやりたくないので、まず一回argsを見て
   // 合計サイズを先に出して文字列を作る
-  while(xs != nil) {
-    Obj s = Car(xs);
-    if (!le_is_string(s))
-      RestoreReturn(RaiseWith(InvalidArgs, args));
+  Obj ys = xs;
+  while(ys != nil) {
+    Obj s = Car(ys);
+    if (!le_is_string(s)) return RaiseWith(InvalidArgs, args);
     size += le_str_len(s);
-    xs = Cdr(xs);
+    ys = Cdr(ys);
   }
 
   Obj str = le_new_str(vm, size);
   char* p = str->Bytes.data;
 
   // 改めてコピー
-  xs = Pop();
   while (xs != nil) {
     Obj s = Car(xs);
     int len = le_str_len(s);
@@ -2117,9 +1882,7 @@ static int primStrMake(LeVM* vm, Obj args) {
   ExpectType(array, xs);
 
   int len = le_array_len(xs);
-  Push(xs);
   Obj str = le_new_str(vm, len);
-  xs = Pop();
   for (int i = 0; i < len; i++) {
     Obj c = xs->Array.data[i];
     ExpectType(num, c);
@@ -2151,9 +1914,7 @@ static int primStrSub(LeVM* vm, Obj args) {
   len = end - start;
 
   // copy
-  Push(s);
   Obj sub = le_new_str(vm, len);
-  s = Pop();
   memcpy(le_cstr_of(sub), le_cstr_of(s) + start, len);
   le_cstr_of(sub)[len] = '\0';
   
@@ -2521,27 +2282,23 @@ static int evalSymbol(LeVM* vm, Obj sym) {
 static int buildLetEnv(LeVM* vm, Obj binds) {
   // inplace!
   // Restoreing vm->env is guaranteed by eval()
-  SaveStack;
   vm->env = le_cons(vm, nil, vm->env);
 
   int code = Le_OK;
   while (binds) {
-    Push(binds);
     Obj bind = Car(binds);
     Obj var = Car(bind);
     Obj val = Second(bind);
-    Push(var);
     code = eval(vm, val);
-    if (code != Le_OK) RestoreReturn(code);
+    ExpectOK;
     
     val = vm->result;
-    var = Pop();
     // create bind var/val on env, as dotted pair
     bind = le_cons(vm, var, val);
     Obj env = le_cons(vm, bind, Car(vm->env));
     SetCar(vm->env, env);
     // next
-    binds = Cdr(Pop());
+    binds = Cdr(binds);
   }
   return code;
 }
@@ -2559,7 +2316,6 @@ static int evalAux(LeVM* vm, Obj expr) {
     if (!le_is_pair(expr))
       DIE("Can't eval %s", toStr(expr));
   
-    SaveStack;
     Obj first = Car(expr);
     Obj rest  = Cdr(expr);
     int code;
@@ -2583,13 +2339,8 @@ static int evalAux(LeVM* vm, Obj expr) {
       Obj cond = Car(rest);
       Obj then = Second(rest);
       Obj els  = Third(rest);
-      Push(els);
-      Push(then);
       code = eval(vm, cond);
-      if (code != Le_OK) RestoreReturn(code);
-      
-      then = Pop(); // then
-      els  = Pop();
+      ExpectOK;
       expr = vm->result != nil ? then : els;
       continue; // tail call!
     }
@@ -2599,12 +2350,10 @@ static int evalAux(LeVM* vm, Obj expr) {
       // env: ( ((var . val) ...) ... )
       Obj binds = Car(rest);
       Obj body = Cdr(rest);
-      Push(body);
 
       code = buildLetEnv(vm, binds);
-      if (code != Le_OK) RestoreReturn(code);
+      ExpectOK;
   
-      body = Pop();
       code = evalExprs(vm, body, &expr);
       ExpectOK;
 
@@ -2612,11 +2361,9 @@ static int evalAux(LeVM* vm, Obj expr) {
     }
     
     // ----- Eval args
-    Push(first);
     code = evalArgs(vm, rest);
-    if (code != Le_OK) RestoreReturn(code);
+    ExpectOK;
     Obj args = vm->result;
-    first = Pop();
 
     // ----- Primitive
     if (le_is_symbol(first) && first->Symbol.prim != nil) {
@@ -2635,22 +2382,18 @@ static int evalAux(LeVM* vm, Obj expr) {
       args = Second(args);
     } else {
       // (f . args)
-      Push(args);
       code = eval(vm, first);
       ExpectOK;
       f = vm->result;
-      args = Pop();
     }
 
     if (!le_is_func(f)) return RaiseWith(NotAProc, f);
 
-    Push(f);
     buildFuncEnv(vm, f, args);
-    f = Pop();
 
     // apply
     code = evalExprs(vm, f->Func.code, &expr);
-    if (code != Le_OK) RestoreReturn(code);
+    ExpectOK;
     continue; // tail call!
   }
   
@@ -2658,9 +2401,9 @@ static int evalAux(LeVM* vm, Obj expr) {
 }
 
 static int eval(LeVM* vm, Obj expr) {
-  Push(vm->env);
+  Obj outerEnv = vm->env;
   int code = evalAux(vm, expr);
-  vm->env = Pop();
+  vm->env = outerEnv;
   return code;
 }
 
