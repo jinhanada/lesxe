@@ -630,7 +630,23 @@ static LeObj* newBytesObj(LeVM* vm, int bytes, int type) {
 }
 
 
-// ===== Conservative GC =====
+// Conservative GC
+// =============================================================================
+
+// ===== for debug/testing =====
+
+static int countFree(LeVM* vm) {
+  Link free = vm->freeList;
+  int n = 0;
+  while(free != nil) {
+    n++;
+    free = free->next;
+  }
+  return n;
+}
+
+
+// ===== Header and Pointer =====
 
 static int isMarked(Cell header) {
   return header & 0x01;
@@ -647,6 +663,9 @@ static int unmarkedHeader(Cell header) {
 static Cell conservativeHash(Obj p) {
   return (Cell)p >> IGNORE_BITS_64; // for 64bit
 }
+
+
+// ===== Mark & Sweep =====
 
 static void markObj(LeVM* vm, Obj p) {
   if (!le_is_obj(p)) return; // nil or num
@@ -750,11 +769,14 @@ static void sweepAll(LeVM* vm) {
 }
 
 static void runGC(LeVM* vm) {
+  DBG("gc start");
   markAll(vm);
   sweepAll(vm);
+  DBG("done free(%d) objs(%ld)", countFree(vm), vm->objCount);
 }
 
-// ===== allocate =====
+
+// ===== Allocate =====
 
 static void pushObj(LeVM* vm, Obj x, Cell cells) {
   Cell hash = conservativeHash(x);
@@ -837,17 +859,6 @@ static LeObj* allocBytesObj(LeVM* vm, int type, int bytes) {
   return b;
 }
 
-// ===== for debug =====
-
-static int countFree(LeVM* vm) {
-  Link free = vm->freeList;
-  int n = 0;
-  while(free != nil) {
-    n++;
-    free = free->next;
-  }
-  return n;
-}
 
 // ===== setup =====
 
