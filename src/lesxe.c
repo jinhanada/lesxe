@@ -146,6 +146,7 @@ struct LeVM {
   // ConservativeGC
   ObjLink** objTable;
   int       objTableLen;
+  intptr_t  objCount;
   // Interpreter
   LeObj* root;
   LeObj* env;
@@ -253,9 +254,11 @@ static int writeTextFile(char* fname, char* s) {
   -----
   最下位ビットが1なら63bit整数(num)、0ならポインタ(obj)。特にポインタ0はnilを表す。
   nilはobjとしては扱わない。le_is_obj(nil) == 0。
+  conservative用のハッシュは最下位3ビットを無視(64bit)
 */
 
 #define nil 0
+#define IGNORE_BITS_64 3
 
 /*
   ヘッダレイアウト
@@ -264,9 +267,6 @@ static int writeTextFile(char* fname, char* s) {
   |         |    |- 1:marked
   |         |- data type(4bit)
   |- cells(59bit)
-
-  ヘッダの最下位ビットが0ならmoved。逆じゃないよ！
-  単にforward先のオブジェクトアドレスを入れるだけで良い。
 */
 
 #define HEADER_CELLS_BIT  5 // << 5
@@ -625,7 +625,7 @@ static LeObj* newBytesObj(LeVM* vm, int bytes, int type) {
 // ===== Conservative GC =====
 
 static int isMarked(Cell header) {
-  return !(header & 0x01);
+  return header & 0x01;
 }
 
 static int markedHeader(Cell header) {
@@ -637,12 +637,12 @@ static int unmarkedHeader(Cell header) {
 }
 
 static Cell conservativeHash(Obj p) {
-  return (Cell)p >> 3; // 64bit
+  return (Cell)p >> IGNORE_BITS_64; // for 64bit
 }
 
 static void markObj(LeVM* vm, Obj p) {
   if (!le_is_obj(p)) return; // nil or num
-  
+
   Cell header = p->header;
   if (isMarked(header)) return;
   
@@ -702,11 +702,54 @@ static void markStack(LeVM* vm, void* start) {
   }
 }
 
+// ===== allocate =====
+
+static void pushObj(LeVM* vm, Obj x) {
+  Cell hash = conservativeHash(x);
+  int len = vm->objTableLen;
+  Cell index = hash % len;
+  
+  ObjLink* link = calloc(sizeof(ObjLink), 1);
+  link->hash = hash;
+  link->obj = x;
+  link->next = vm->objTable[index];
+  vm->objTable[index] = link;
+}
+
+static Obj allocate(LeVM* vm, Cell cells, Cell header) {
+  Cell actual = cells + OBJECT_HEADER_CELLS;
+
+  // TODO GC
+
+  Obj obj = calloc(sizeof(Cell), actual); // nil cleared
+  obj->header = header;
+  vm->objCount++;
+  pushObj(vm, obj);
+  
+  return obj;
+}
+
+static Obj allocObj(LeVM* vm, int type, Cell cells) {
+  Cell header = makeHeader(cells, type);
+  return allocate(vm, cells, header);
+}
+
+static LeObj* allocBytesObj(LeVM* vm, int type, int bytes) {
+  Cell cells = align(bytes) / sizeof(Cell) + 1; // size cell
+  Obj b = allocObj(vm, cells, type);
+  b->Bytes.size = bytes;
+  return b;
+}
+
+
+// ===== setup =====
+
 #define OBJTABLE_LEN 257
 static void setupConservativeGC(LeVM* vm) {
   vm->objTable = calloc(sizeof(ObjLink*), OBJTABLE_LEN);
   vm->objTableLen = OBJTABLE_LEN;
 }
+
 
 // Data Types
 // =============================================================================
@@ -1162,6 +1205,10 @@ Public void le_free_vm(LeVM* vm) {
   free(vm->new);
   free(vm->old);
   free(vm->tmp);
+
+  // Conservative GC
+  free(vm->objTable);
+  //TODO: free all allocated objects and check its count
 
   free(vm);
 }

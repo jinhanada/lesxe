@@ -288,9 +288,22 @@ void test_gc_integration() {
 
 // ===== Conservative GC Test =====
 
+void test_aux_traverse_stack(LeVM* vm, void* start) {
+  Obj x = allocObj(vm, T_ARRAY, 2);
+  Obj y = allocObj(vm, T_ARRAY, 2);
+  Obj n = le_int2obj(42);
+  x->Array.data[0] = y;
+  x->Array.data[1] = n; 
+  y->Array.data[0] = n;
+  y->Array.data[1] = x; // mutual recursion
+  markStack(vm, start);
+  assert(isMarked(x->header));
+  assert(isMarked(y->header));
+}
+
 void test_traverse_stack(LeVM* vm) {
   void* start;
-  markStack(vm, &start);
+  test_aux_traverse_stack(vm, &start);
 }
 
 // Macros for VM test
