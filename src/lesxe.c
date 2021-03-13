@@ -114,7 +114,7 @@ struct LeObj {
     Array   Array;
     Symbol  Symbol;
     Pair    Pair;
-    Func Func;
+    Func    Func;
     Bytes   Bytes;
     Root    Root;
   };
@@ -124,6 +124,12 @@ struct LeObj {
 
 
 // ===== VM =====
+
+typedef struct ObjLink {
+  intptr_t hash;
+  LeObj*   obj;
+  struct ObjLink* next;
+} ObjLink;
 
 struct LeVM {
   // parser
@@ -137,6 +143,9 @@ struct LeVM {
   LeObj**  scanned;
   LeObj**  tmp;     // save temporary object from GC
   int      tp;      // temporary stack pointer
+  // ConservativeGC
+  ObjLink** objTable;
+  int       objTableLen;
   // Interpreter
   LeObj* root;
   LeObj* env;
@@ -238,7 +247,7 @@ static int writeTextFile(char* fname, char* s) {
 // =============================================================================
 
 /*
-  Cheney's CopyGC
+  Conservative Mark&Sweep GC
 
   タグ付きポインタ
   -----
@@ -252,7 +261,7 @@ static int writeTextFile(char* fname, char* s) {
   ヘッダレイアウト
   -----
   00...000  0000 0
-  |         |    |- 0:moved(pointer)
+  |         |    |- 1:marked
   |         |- data type(4bit)
   |- cells(59bit)
 
@@ -615,10 +624,61 @@ static LeObj* newBytesObj(LeVM* vm, int bytes, int type) {
 
 // ===== Conservative GC =====
 
+static int isMarked(Cell header) {
+  return !(header & 0x01);
+}
+
+static int markedHeader(Cell header) {
+  return header | 0x01;
+}
+
+static int unmarkedHeader(Cell header) {
+  return header ^ 0x01;
+}
+
+static Cell conservativeHash(Obj p) {
+  return (Cell)p >> 3; // 64bit
+}
+
 static void markObj(LeVM* vm, Obj p) {
-  if (!le_is_obj(p)) return;
+  if (!le_is_obj(p)) return; // nil or num
   
-  DBG("obj: %p", p);
+  Cell header = p->header;
+  if (isMarked(header)) return;
+  
+  header = markedHeader(header);
+  p->header = header;
+  if (isBytes(header)) return;
+
+  int len = cellsOf(header);
+  for (int i = 0; i < len; i++) {
+    Obj child = p->Array.data[i];
+    markObj(vm, child);
+  }
+}
+
+static Obj getRealObj(LeVM* vm, Cell hash) {
+  int len = vm->objTableLen;
+  int index = hash % len;
+  ObjLink* link = vm->objTable[index];
+  
+  if (link == nil) return nil;
+  
+  while (link) {
+    if (link->hash = hash) return link->obj;
+    link = link->next;
+  }
+  
+  return nil;
+}
+
+static void markConservative(LeVM* vm, Obj p) {
+  if (!le_is_obj(p)) return;
+
+  Cell hash = conservativeHash(p);
+  Obj x = getRealObj(vm, hash);
+  if (x == nil) return; // no real obj
+  markObj(vm, x);
 }
 
 static void markStack(LeVM* vm, void* start) {
@@ -638,10 +698,15 @@ static void markStack(LeVM* vm, void* start) {
   for (void* p = top; p >= bottom; p = ((Byte*)p) - sizeof(void*)) {
     assert((Cell)p == align((Cell)p));
     Obj x = *(Obj*)p;
-    markObj(vm, x);
+    markConservative(vm, x);
   }
 }
 
+#define OBJTABLE_LEN 257
+static void setupConservativeGC(LeVM* vm) {
+  vm->objTable = calloc(sizeof(ObjLink*), OBJTABLE_LEN);
+  vm->objTableLen = OBJTABLE_LEN;
+}
 
 // Data Types
 // =============================================================================
@@ -1076,6 +1141,9 @@ Public LeVM* le_new_vm(int cells, int repl_buf_size) {
   vm->old   = calloc(sizeof(Cell), cells);
   vm->here  = vm->new;
   vm->tmp   = calloc(sizeof(Obj), TEMPORARY_STACK_SIZE);
+
+  // conservative gc
+  setupConservativeGC(vm);
 
   // root
   vm->root = newRoot(vm);
