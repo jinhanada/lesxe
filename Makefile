@@ -50,6 +50,15 @@ memcheck: all $(OUT)/test_lesxe
 		--undef-value-errors=no \
 		$(BIN)/lesxe test/all.le
 
+.PHONY: memcheck_lesxe
+memcheck_lesxe: all
+	valgrind \
+		--tool=memcheck \
+		--leak-check=full \
+		--log-file=out/valgrind_lesxe.log \
+		--undef-value-errors=no \
+		$(BIN)/lesxe
+
 
 .PHONY: run
 run: all
