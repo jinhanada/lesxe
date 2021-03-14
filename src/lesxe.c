@@ -603,7 +603,6 @@ static void pushObj(LeVM* vm, Obj x, Cell cells) {
 }
 
 static Obj searchFreeList(LeVM* vm, Cell cells, Cell header) {
-  if (vm->debug) return nil;
   //TODO: separate list by 2^n
   Link link = vm->freeList;
   Link before = nil;
@@ -612,7 +611,7 @@ static Obj searchFreeList(LeVM* vm, Cell cells, Cell header) {
     if (link->cells >= cells) {
       Obj x = link->obj;
       Cell realCells = link->cells;
-      memset(&(x->Array.data), nil, realCells * sizeof(Cell)); // nil clear
+      memset(x->Array.data, nil, realCells * sizeof(Cell)); // nil clear
       x->header = header;
       // reconnect link
       if (before == nil) {
