@@ -677,7 +677,7 @@ static void freeObjectLink(LeVM* vm, Link link) {
     free(old->obj);
     free(old);
     vm->objCount--;
-    if (vm->objCount < 0) DBG("unbalanced freeObject");
+    if (vm->objCount < 0) DIE("unbalanced freeObject");
   }
 }
 
