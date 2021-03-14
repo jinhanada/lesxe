@@ -1471,7 +1471,7 @@ static int evalArgs(LeVM* vm, Obj args) {
     int code = eval(vm, expr);
     if (code != Le_OK) return code;
     Obj val = vm->result;
-    vals = le_cons(vm, val, vals);
+    vals = Cons(vm, val, vals);
   }
 
   vm->result = le_reverse_inplace(vals);
@@ -1493,20 +1493,20 @@ static void buildFuncEnv(LeVM* vm, Obj func, Obj args) {
   while (vars != nil) {
     // rest
     if (le_is_symbol(vars)) {
-      Obj bind = le_cons(vm, vars, args);
-      env = le_cons(vm, bind, env);
+      Obj bind = Cons(vm, vars, args);
+      env = Cons(vm, bind, env);
       break;
     }
 
     // single
-    Obj bind = le_cons(vm, Car(vars), Car(args));
-    env = le_cons(vm, bind, env);
+    Obj bind = Cons(vm, Car(vars), Car(args));
+    env = Cons(vm, bind, env);
     args = Cdr(args);
     vars = Cdr(vars);        
   }
 
   // set
-  vm->env = le_cons(vm, env, vm->env);
+  vm->env = Cons(vm, env, vm->env);
 }
 
 static int applyFunc(LeVM* vm, Obj func, Obj args) {
@@ -2302,7 +2302,7 @@ static int evalSymbol(LeVM* vm, Obj sym) {
 static int buildLetEnv(LeVM* vm, Obj binds) {
   // inplace!
   // Restoreing vm->env is guaranteed by eval()
-  vm->env = le_cons(vm, nil, vm->env);
+  vm->env = Cons(vm, nil, vm->env);
 
   int code = Le_OK;
   while (binds) {
@@ -2314,8 +2314,8 @@ static int buildLetEnv(LeVM* vm, Obj binds) {
     
     val = vm->result;
     // create bind var/val on env, as dotted pair
-    bind = le_cons(vm, var, val);
-    Obj env = le_cons(vm, bind, Car(vm->env));
+    bind = Cons(vm, var, val);
+    Obj env = Cons(vm, bind, Car(vm->env));
     SetCar(vm->env, env);
     // next
     binds = Cdr(binds);
