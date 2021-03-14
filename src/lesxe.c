@@ -56,7 +56,7 @@ enum {
       SymPrimReadTextFile, SymPrimWriteTextFile,
       /* read */ SymPrimReadStr,
       /* error */ SymPrimRaise,
-      /* system */ SymPrimExit, SymPrimGC, SymPrimLoadFile,
+      /* system */ SymPrimExit, SymPrimGC, SymPrimSysDebug, SymPrimLoadFile,
       /* network */
       SymPrimSocketMake, SymPrimSocketListen, SymPrimSocketAccept, SymPrimSocketRecv,
       SymPrimSocketSend, SymPrimSocketClose,
@@ -461,6 +461,12 @@ static Cell conservativeHash(Obj p) {
   return (Cell)p >> IGNORE_BITS_64; // for 64bit
 }
 
+static Cell objTableIndex(LeVM* vm, Cell hash) {
+  int len = vm->objTableLen;
+  Cell index = abs(hash % len);
+  return index;
+}
+
 
 // ===== Mark & Sweep =====
 
@@ -482,8 +488,7 @@ static void markObj(LeVM* vm, Obj p) {
 }
 
 static Link getLink(LeVM* vm, Cell hash) {
-  int len = vm->objTableLen;
-  int index = hash % len;
+  Cell index = objTableIndex(vm, hash);
   Link link = vm->objTable[index];
 
   if (link == nil) return nil;
@@ -586,8 +591,7 @@ Public void le_gc(LeVM* vm) {
 
 static void pushObj(LeVM* vm, Obj x, Cell cells) {
   Cell hash = conservativeHash(x);
-  int len = vm->objTableLen;
-  Cell index = hash % len;
+  Cell index = objTableIndex(vm, hash);
   
   Link link = calloc(sizeof(ObjLink), 1);
   link->hash = hash;
@@ -599,6 +603,7 @@ static void pushObj(LeVM* vm, Obj x, Cell cells) {
 }
 
 static Obj searchFreeList(LeVM* vm, Cell cells, Cell header) {
+  if (vm->debug) return nil;
   //TODO: separate list by 2^n
   Link link = vm->freeList;
   Link before = nil;
@@ -2127,6 +2132,14 @@ static int primGC(LeVM* vm, Obj args) {
   return Le_OK;
 }
 
+static int primSysDebug(LeVM* vm, Obj args) {
+  // (%prim:sys-debug Flag) => Flag
+  Obj flag = Car(args);
+  vm->debug = flag != nil;
+  vm->result = flag;
+  return Le_OK;
+}
+
 static int primLoadFile(LeVM* vm, Obj args) {
   Obj fname = Car(args);
   ExpectType(string, fname);
@@ -2669,6 +2682,7 @@ static void setupPrimitives(LeVM* vm) {
   /* System */
   DefPrim(Exit,              "exit");
   DefPrim(GC,                "gc");
+  DefPrim(SysDebug,          "sys-debug");
   DefPrim(LoadFile,          "load-file");
   /* Network */
   DefPrim(SocketMake,        "socket-make");

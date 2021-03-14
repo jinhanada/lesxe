@@ -1,3 +1,4 @@
+(%prim:sys-debug true)
 (def list (fn Xs Xs))
 (def else true)
 
@@ -568,6 +569,9 @@
 
 (de (sys:gc)
   (%prim:gc))
+
+(de (sys:debug Flag)
+  (%prim:sys-debug Flag))
 
 (de (sys:load FName)
   (%prim:load-file FName))

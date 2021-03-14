@@ -36,12 +36,12 @@ clean:
 
 
 .PHONY: memcheck
-memcheck: all test
+memcheck: all $(OUT)/test_lesxe
 	valgrind \
 		--tool=memcheck \
 		--leak-check=full \
 		--log-file=out/valgrind.log \
-		./out/test_lesxe
+		$(OUT)/test_lesxe
 
 
 .PHONY: run
