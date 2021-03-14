@@ -41,7 +41,14 @@ memcheck: all $(OUT)/test_lesxe
 		--tool=memcheck \
 		--leak-check=full \
 		--log-file=out/valgrind.log \
+		--undef-value-errors=no \
 		$(OUT)/test_lesxe
+	valgrind \
+		--tool=memcheck \
+		--leak-check=full \
+		--log-file=out/valgrind_lesxe.log \
+		--undef-value-errors=no \
+		$(BIN)/lesxe test/all.le
 
 
 .PHONY: run

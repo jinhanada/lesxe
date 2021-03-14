@@ -603,6 +603,7 @@ static void pushObj(LeVM* vm, Obj x, Cell cells) {
 }
 
 static Obj searchFreeList(LeVM* vm, Cell cells, Cell header) {
+  if (vm->debug) return nil;
   //TODO: separate list by 2^n
   Link link = vm->freeList;
   Link before = nil;
@@ -1842,7 +1843,7 @@ static int primStrCat(LeVM* vm, Obj args) {
   Obj ys = xs;
   while(ys != nil) {
     Obj s = Car(ys);
-    if (!le_is_string(s)) return RaiseWith(InvalidArgs, args);
+    ExpectType(string, s);
     size += le_str_len(s);
     ys = Cdr(ys);
   }
@@ -1858,9 +1859,9 @@ static int primStrCat(LeVM* vm, Obj args) {
     p += len;
     xs = Cdr(xs);
   }
-  p[size] = '\0';
+  str->Bytes.data[size] = '\0';
   vm->result = str;
-  
+
   return Le_OK;
 }
 
