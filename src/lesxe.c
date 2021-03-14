@@ -603,7 +603,6 @@ static void pushObj(LeVM* vm, Obj x, Cell cells) {
 }
 
 static Obj searchFreeList(LeVM* vm, Cell cells, Cell header) {
-  if (vm->debug) return nil;
   //TODO: separate list by 2^n
   Link link = vm->freeList;
   Link before = nil;
