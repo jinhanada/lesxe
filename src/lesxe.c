@@ -157,6 +157,8 @@ struct LeVM {
   LeObj* symTable[SymTableSize];
   // REPL
   int replBufSize;
+  // debug
+  int debug;
 };
 
   
@@ -483,9 +485,9 @@ static Link getLink(LeVM* vm, Cell hash) {
   int len = vm->objTableLen;
   int index = hash % len;
   Link link = vm->objTable[index];
-  
+
   if (link == nil) return nil;
-  
+
   while (link) {
     if (link->hash = hash) return link;
     link = link->next;
@@ -494,13 +496,19 @@ static Link getLink(LeVM* vm, Cell hash) {
   return nil;
 }
 
+static Obj getRealObj(LeVM* vm, Cell hash) {
+  Link link = getLink(vm, hash);
+  return link == nil ? nil : link->obj;
+}
+
 static void markConservative(LeVM* vm, Obj p) {
   if (!le_is_obj(p)) return;
   if (vm->addrMax != 0 && vm->addrMax < p) return; // out of range
   if (vm->addrMin != 0 && vm->addrMin > p) return; // out of range
 
   Cell hash = conservativeHash(p);
-  Obj x = getLink(vm, hash)->obj;
+
+  Obj x = getRealObj(vm, hash);
   if (x == nil) return; // no real obj
   markObj(vm, x);
 }
@@ -566,11 +574,11 @@ static void sweepAll(LeVM* vm) {
 }
 
 Public void le_gc(LeVM* vm) {
-  DBG("gc mark");
+  if (vm->debug) DBG("gc mark");
   markAll(vm);
-  DBG("   sweep");
+  if (vm->debug) DBG("   sweep");
   sweepAll(vm);
-  DBG("done free(%d) objs(%ld)", countFree(vm), vm->objCount);
+  if (vm->debug) DBG("done free(%d) objs(%ld)", countFree(vm), vm->objCount);
 }
 
 
