@@ -1815,7 +1815,7 @@ static int primStrCat(LeVM* vm, Obj args) {
     p += len;
     xs = Cdr(xs);
   }
-  p[size] = '\0';
+  str->Bytes.data[size] = '\0';
   vm->result = str;
   
   return Le_OK;
