@@ -139,7 +139,7 @@ int handle_opts(Options* opts, LeVM* vm, int argc, char* argv[]) {
         fprintf(stderr, "Unknown option: %c\n", optopt);
       }
       usage();
-      exit(0);
+      exit(1);
     }
   }
 
