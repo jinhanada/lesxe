@@ -10,7 +10,7 @@ CFLAGS += -g
 all: $(BIN)/lesxe $(BIN)/text2c
 
 $(SRC)/corelib.h: $(BIN)/text2c $(SRC)/core.le
-	cat $(SRC)/core.le | $(BIN)/text2c corelib_src > $(SRC)/corelib.h
+	$(BIN)/text2c corelib_src $(SRC)/core.le $(SRC)/corelib.h
 
 $(OUT)/lesxe.o: $(SRC)/lesxe.c $(SRC)/lesxe.h $(SRC)/corelib.h
 	$(CC) $(CFLAGS) -c -o $(OUT)/lesxe.o $(SRC)/lesxe.c
