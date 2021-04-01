@@ -28,15 +28,18 @@
                             (list:reverse! Acc)))))
           (list ReqLine Fields Body)))))
 
-(de (http:html-response Html)
+(de (http:html-response Html State)
   (let ((Len (+ (str:len Html) 3)))
-    (str "HTTP/1.0 200 OK\r\n"
+    (str "HTTP/1.0 " State "\r\n"
          "Content-Length: " Len "\r\n"
          "Content-Type: text/html\r\n"
          "Connection: close\r\n"
          "\r\n"
          Html
          "\r\n\r\n")))
+
+(def html:200 "200 OK")
+(def html:404 "404 Not Found")
 
 
 ;; ===== Example Application =====
@@ -59,10 +62,10 @@
    "</textarea></div><div><input type=\"submit\">Send</input></div></form>"
    ))
 
-(de (app:res Res Req)
-  (if app:dev?
-    (http:html-response (str Res (app:dev:reqs Req)))
-    (http:html-response Res)))
+(de (app:res Res Req State)
+  (http:html-response
+   (if app:dev? (str Res (app:dev:reqs Req)) Res)
+   State))
 
 (de (title S)
   (str "<h1>" S "</h1>"))
@@ -83,30 +86,30 @@
   (prn "handle: hello")
   (-> (str (title "Hello!")
            menu)
-      (app:res Req)))
+      (app:res Req html:200)))
 
 (de (handle-hello-world Req)
   (prn "handle: hello-world")
   (-> (str (title "Hello World!")
            menu)
-      (app:res Req)))
+      (app:res Req html:200)))
 
 (de (handle-root Req)
   (prn "handle: root")
   (-> (str (title "Welcome")
            menu)
-      (app:res Req)))
+      (app:res Req html:200)))
 
 (de (handle-set-message Req)
   (prn "handle: set-message")
   (set! app:message (cdr (str:split1 (http:req-body Req) "=")))
   (-> (str (title "Done.")
            menu)
-      (app:res Req)))
+      (app:res Req html:200)))
 
 (de (handle-404 Req)
   (-> (str (title "404 Not Found"))
-      (app:res Req)))
+      (app:res Req html:404)))
 
 (def app:handlers
   (list
@@ -137,8 +140,8 @@
              (_     (print "===== accept:" WSock))
              (Data  (sock:recv WSock 4096)))
          (if Data
-           (let ((Req    (http:parse-request Data))
-                 (Res    (app:handle Req)))
+           (let ((Req (http:parse-request Data))
+                 (Res (app:handle Req)))
              (when app:dev?
                (prn "request")
                (list:each Req prn))
