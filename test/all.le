@@ -1,71 +1,71 @@
-(demac (test Name . Body)
+(demac (test name . body)
   `(catch
     (let ()
-      (prin1 (str 'test " " ',Name " ... "))
-      ,@Body
+      (prin1 (str 'test " " ',name " ... "))
+      ,@body
       (print 'ok))
-    (fn (E) (print (list 'test 'failed ',Name E)))))
+    (fn (e) (print (list 'test 'failed ',name e)))))
 
-(de (assert Cond)
-  (or Cond (raise 'assert)))
+(de (assert cond)
+  (or cond (raise 'assert)))
 
-(demac (assert= A B)
-  `(let ((X ,A)
-         (Y ,B))
-     (or (= X Y)
-         (raise (list 'assert= '(,A ,B) 'but 'got (list X Y))))))
+(demac (assert= a b)
+  `(let ((x ,a)
+         (y ,b))
+     (or (= x y)
+         (raise (list 'assert= '(,a ,b) 'but 'got (list x y))))))
 
 
 (test letrec
   ;; single recursion
   (assert
    (= 11
-      (letrec ((F (fn (X)
-                    (if (> X 10)
-                      X
-                      (F (+ X 1))))))
-        (F 0))))
+      (letrec ((f (fn (x)
+                    (if (> x 10)
+                      x
+                      (f (+ x 1))))))
+        (f 0))))
   
   ;; mutual recursion
   (assert
    (= 11
-      (letrec ((F (fn (X) (if (> X 10) X (G (+ X 1)))))
-               (G (fn (X) (if (> X 10) X (F (+ X 1))))))
-       (F 0)))))
+      (letrec ((f (fn (x) (if (> x 10) x (g (+ x 1)))))
+               (g (fn (x) (if (> x 10) x (f (+ x 1))))))
+       (f 0)))))
 
 
 (test record-case
   (assert=
    'a
    (record-case '(foo a b)
-     ((foo A B) A)
+     ((foo a b) a)
      (else      'b)))
 
   (assert=
    'b
    (record-case '(bar a b)
-     ((foo A B) A)
+     ((foo a b) a)
      (else      'b)))
 
   (assert=
    'x
    (catch
     (record-case '(bar a b)
-      ((foo A B) A))
+      ((foo a b) a))
     (fn (_) 'x))))
 
 
 (test cond
   (letrec
-      ((F
-        (fn (N)
+      ((f
+        (fn (n)
           (cond
-           ((= N 1) 'a)
-           ((= N 2) 'b)
+           ((= n 1) 'a)
+           ((= n 2) 'b)
            (else    'c)))))
-    (assert= 'a (F 1))
-    (assert= 'b (F 2))
-    (assert= 'c (F 3))))
+    (assert= 'a (f 1))
+    (assert= 'b (f 2))
+    (assert= 'c (f 3))))
 
 
 (test threading-macro

@@ -1,263 +1,263 @@
-(def list (fn Xs Xs))
+(def list (fn xs xs))
 (def else true)
 
-(def +   (fn (A B) (%prim:add A B)))
-(def -   (fn (A B) (%prim:sub A B)))
-(def *   (fn (A B) (%prim:mul A B)))
-(def /   (fn (A B) (%prim:div A B)))
-(def mod (fn (A B) (%prim:mod A B)))
-(def inc (fn (N)   (%prim:add N 1)))
-(def dec (fn (N)   (%prim:sub N 1)))
+(def +   (fn (a b) (%prim:add a b)))
+(def -   (fn (a b) (%prim:sub a b)))
+(def *   (fn (a b) (%prim:mul a b)))
+(def /   (fn (a b) (%prim:div a b)))
+(def mod (fn (a b) (%prim:mod a b)))
+(def inc (fn (n)   (%prim:add n 1)))
+(def dec (fn (n)   (%prim:sub n 1)))
 
-(def =   (fn (A B) (%prim:eq A B)))
-(def not (fn (X)   (%prim:not X)))
+(def =   (fn (a b) (%prim:eq a b)))
+(def not (fn (x)   (%prim:not x)))
 
-(def >  (fn (A B) (%prim:gt A B)))
-(def >= (fn (A B) (if (= A B) true (> A B))))
-(def <  (fn (A B) (not (>= A B))))
-(def <= (fn (A B) (not (> A B))))
+(def >  (fn (a b) (%prim:gt a b)))
+(def >= (fn (a b) (if (= a b) true (> a b))))
+(def <  (fn (a b) (not (>= a b))))
+(def <= (fn (a b) (not (> a b))))
 
-(def neg (fn (N) (- 0 N)))
-(def abs (fn (N) (if (> 0 N) (neg N) N)))
+(def neg (fn (n) (- 0 n)))
+(def abs (fn (n) (if (> 0 n) (neg n) n)))
 
 
-;; Types
+;; types
 ;; =====================================
 (def type-of
-     (fn (X) (%prim:type-of X)))
-(def nil?     (fn (X) (not X)))
-(def number?  (fn (X) (= (type-of X) 'number)))
-(def array?   (fn (X) (= (type-of X) 'array)))
-(def symbol?  (fn (X) (= (type-of X) 'symbol)))
-(def pair?    (fn (X) (= (type-of X) 'pair)))
-(def func?    (fn (X) (= (type-of X) 'func)))
-(def bytes?   (fn (X) (= (type-of X) 'bytes)))
-(def string?  (fn (X) (= (type-of X) 'string)))
+     (fn (x) (%prim:type-of x)))
+(def nil?     (fn (x) (not x)))
+(def number?  (fn (x) (= (type-of x) 'number)))
+(def array?   (fn (x) (= (type-of x) 'array)))
+(def symbol?  (fn (x) (= (type-of x) 'symbol)))
+(def pair?    (fn (x) (= (type-of x) 'pair)))
+(def func?    (fn (x) (= (type-of x) 'func)))
+(def bytes?   (fn (x) (= (type-of x) 'bytes)))
+(def string?  (fn (x) (= (type-of x) 'string)))
 
 (def hash-of
-     (fn (X) (%prim:hash X)))
+     (fn (x) (%prim:hash x)))
 
 
-;; Error
+;; error
 ;; =====================================
 
 (def raise
-     (fn (Error) (%prim:raise Error)))
+     (fn (error) (%prim:raise error)))
 
 
-;; Array
+;; array
 ;; =====================================
-(def array:new  (fn (N)      (%prim:array-new N)))
-(def array:get  (fn (Xs I)   (%prim:array-get Xs I)))
-(def array:set! (fn (Xs I V) (%prim:array-set! Xs I V)))
-(def array:len  (fn (Xs)     (%prim:array-len Xs)))
+(def array:new  (fn (n)      (%prim:array-new n)))
+(def array:get  (fn (xs i)   (%prim:array-get xs i)))
+(def array:set! (fn (xs i v) (%prim:array-set! xs i v)))
+(def array:len  (fn (xs)     (%prim:array-len xs)))
 
 
-;; Pair
+;; pair
 ;; =====================================
-(def cons     (fn (A B) (%prim:cons A B)))
-(def car      (fn (Xs) (%prim:car Xs)))
-(def cdr      (fn (Xs) (%prim:cdr Xs)))
-(def set-car! (fn (Xs V) (%prim:set-car! Xs V)))
-(def set-cdr! (fn (Xs V) (%prim:set-cdr! Xs V)))
+(def cons     (fn (a b) (%prim:cons a b)))
+(def car      (fn (xs) (%prim:car xs)))
+(def cdr      (fn (xs) (%prim:cdr xs)))
+(def set-car! (fn (xs v) (%prim:set-car! xs v)))
+(def set-cdr! (fn (xs v) (%prim:set-cdr! xs v)))
 
-(def caar (fn (Xs) (car (car Xs))))
-(def cadr (fn (Xs) (car (cdr Xs))))
-(def cdar (fn (Xs) (cdr (car Xs))))
-(def cddr (fn (Xs) (cdr (cdr Xs))))
+(def caar (fn (xs) (car (car xs))))
+(def cadr (fn (xs) (car (cdr xs))))
+(def cdar (fn (xs) (cdr (car xs))))
+(def cddr (fn (xs) (cdr (cdr xs))))
 
-(def second (fn (Xs) (car (cdr Xs))))
-(def third  (fn (Xs) (car (cdr (cdr Xs)))))
+(def second (fn (xs) (car (cdr xs))))
+(def third  (fn (xs) (car (cdr (cdr xs)))))
 
 
 (def list:each
-     (fn (Xs F)
-       (if Xs
+     (fn (xs f)
+       (if xs
          (let ()
-           (F (car Xs))
-           (list:each (cdr Xs) F))
-         Xs)))
+           (f (car xs))
+           (list:each (cdr xs) f))
+         xs)))
 
 (def list:len
-     (fn (Xs)
-       (let ((Len 0))
-         (list:each Xs (fn (_) (set! Len (+ Len 1))))
-         Len)))
+     (fn (xs)
+       (let ((len 0))
+         (list:each xs (fn (_) (set! len (+ len 1))))
+         len)))
 
 (def list:map
-     (fn (Xs F)
-       (if Xs
-           (cons (F (car Xs))
-                 (list:map (cdr Xs) F))
+     (fn (xs f)
+       (if xs
+           (cons (f (car xs))
+                 (list:map (cdr xs) f))
            nil)))
 
 (def list:concat
-     (fn (Xs Ys)
-       (if Xs
-           (cons (car Xs) (list:concat (cdr Xs) Ys))
-           Ys)))
+     (fn (xs ys)
+       (if xs
+           (cons (car xs) (list:concat (cdr xs) ys))
+           ys)))
 
 
-;; ===== Assoc (mutable) =====
+;; ===== assoc (mutable) =====
 
-(def assoc:sign '<Assoc>)
+(def assoc:sign '<assoc>)
 
 (def assoc:new
-     (fn Args
+     (fn args
        (let ((rec nil))
          (set! rec
-               (fn (Xs Acc)
-                 (if Xs
-                   (rec (cddr Xs)
-                        (cons (cons (car Xs) (second Xs)) Acc))
-                   (cons assoc:sign Acc))))
-         (rec Args nil))))
+               (fn (xs acc)
+                 (if xs
+                   (rec (cddr xs)
+                        (cons (cons (car xs) (second xs)) acc))
+                   (cons assoc:sign acc))))
+         (rec args nil))))
 
 (def assoc:ref
-     (fn (Assoc Key)
+     (fn (assoc key)
        (let ((rec nil))
          (set! rec
-               (fn (Xs)
-                 (if Xs
-                   (let ((X (car Xs)))
-                     (if (= (car X) Key)
-                       X
-                       (rec (cdr Xs)))))))
-         (rec (cdr Assoc)))))
+               (fn (xs)
+                 (if xs
+                   (let ((x (car xs)))
+                     (if (= (car x) key)
+                       x
+                       (rec (cdr xs)))))))
+         (rec (cdr assoc)))))
 
 (def assoc:get
-     (fn (Assoc Key)
-       (cdr (assoc:ref Assoc Key))))
+     (fn (assoc key)
+       (cdr (assoc:ref assoc key))))
 
 (def assoc:set!
-     (fn (Assoc Key Val)
-       (let ((Ref (assoc:ref Assoc Key)))
-         (if Ref
-             (set-cdr! Ref Val)
-             (set-cdr! Assoc (cons (cons Key Val)
-                                   (cdr Assoc)))))
-       Assoc))
+     (fn (assoc key val)
+       (let ((ref (assoc:ref assoc key)))
+         (if ref
+             (set-cdr! ref val)
+             (set-cdr! assoc (cons (cons key val)
+                                   (cdr assoc)))))
+       assoc))
 
 
-;; ===== Dict (mutable hash table) =====
+;; ===== dict (mutable hash table) =====
 
-(def dict:sign '<Dict>)
+(def dict:sign '<dict>)
 (def dict:default-size 63)
 
 (def dict:aux:index
-     (fn (Xs Key)
-       (let ((Len  (array:len Xs))
-             (Hash (hash-of Key)))
-         (mod (abs Hash) Len))))
+     (fn (xs key)
+       (let ((len  (array:len xs))
+             (hash (hash-of key)))
+         (mod (abs hash) len))))
 
 (def dict:aux:entry
-     (fn (Dict Key)
-       (let ((Xs   (second Dict))
-             (I    (dict:aux:index Xs Key)))
-         (array:get Xs I))))
+     (fn (dict key)
+       (let ((xs   (second dict))
+             (i    (dict:aux:index xs key)))
+         (array:get xs i))))
 
 (def dict:aux:set
-     (fn (Xs Key Val)
-       (let ((I     (dict:aux:index Xs Key))
-             (Assoc (array:get Xs I)))
-         (if Assoc
-             (assoc:set! Assoc Key Val)
-             (array:set! Xs I (assoc:new Key Val))))))
+     (fn (xs key val)
+       (let ((i     (dict:aux:index xs key))
+             (assoc (array:get xs i)))
+         (if assoc
+             (assoc:set! assoc key val)
+             (array:set! xs i (assoc:new key val))))))
 
 (def dict:new
-     (fn Args
+     (fn args
        (let ((rec nil)
-             (Len dict:default-size)
-             (Xs (array:new Len)))
+             (len dict:default-size)
+             (xs (array:new len)))
          (set! rec
-               (fn (Args)
-                 (if Args
+               (fn (args)
+                 (if args
                    (let ()
-                     (dict:aux:set Xs (car Args) (second Args))
-                     (rec (cdr Args))))))
-         (rec Args)
-         (list dict:sign Xs))))
+                     (dict:aux:set xs (car args) (second args))
+                     (rec (cdr args))))))
+         (rec args)
+         (list dict:sign xs))))
 
 (def dict:has?
-     (fn (Dict Key)
-       (if (dict:aux:entry Dict Key) true nil)))
+     (fn (dict key)
+       (if (dict:aux:entry dict key) true nil)))
 
 (def dict:get
-     (fn (Dict Key)
-       (let ((Assoc (dict:aux:entry Dict Key)))
-         (assoc:get Assoc Key))))
+     (fn (dict key)
+       (let ((assoc (dict:aux:entry dict key)))
+         (assoc:get assoc key))))
 
 (def dict:set!
-     (fn (Dict Key Val)
-       (let ((Xs (second Dict)))
-         (dict:aux:set Xs Key Val)
-         Dict)))
+     (fn (dict key val)
+       (let ((xs (second dict)))
+         (dict:aux:set xs key val)
+         dict)))
 
 
-;; Symbol
+;; symbol
 ;; =====================================
 
 (def sym:new
-     (fn (Str) (%prim:sym-new Str)))
+     (fn (str) (%prim:sym-new str)))
 
 (def sym:str
-     (fn (Sym) (%prim:sym-str Sym)))
+     (fn (sym) (%prim:sym-str sym)))
 
 
-;; String
+;; string
 ;; =====================================
 
-(def strfy (fn (S) (%prim:str S)))
-(def str= (fn (A B) (%prim:str-eq A B)))
-(def str:get (fn (S I) (%prim:str-get S I)))
-(def str:len (fn (S) (%prim:str-len S)))
-(def str:cat (fn (Xs) (%prim:str-cat Xs)))
-(def str:sub (fn (S Start End) (%prim:str-sub S Start End)))
-(def str:index (fn (S What) (%prim:str-index S What)))
+(def strfy (fn (s) (%prim:str s)))
+(def str= (fn (a b) (%prim:str-eq a b)))
+(def str:get (fn (s i) (%prim:str-get s i)))
+(def str:len (fn (s) (%prim:str-len s)))
+(def str:cat (fn (xs) (%prim:str-cat xs)))
+(def str:sub (fn (s start end) (%prim:str-sub s start end)))
+(def str:index (fn (s what) (%prim:str-index s what)))
 (def str:make
-     ;; ArrayOfChars -> String
-     (fn (Xs) (%prim:str-make Xs)))
+     ;; arrayofchars -> string
+     (fn (xs) (%prim:str-make xs)))
 
 (def str
-     (fn Args
+     (fn args
        (%prim:str-cat
-        (list:map Args (fn (X) (if (string? X) X (strfy X)))))))
+        (list:map args (fn (x) (if (string? x) x (strfy x)))))))
 
 
 
-;; Bytes
+;; bytes
 ;; =====================================
 
-(def bytes:new  (fn (N)      (%prim:bytes-new N)))
-(def bytes:get  (fn (Xs I)   (%prim:bytes-get Xs I)))
-(def bytes:set! (fn (Xs I V) (%prim:bytes-set! Xs I V)))
-(def bytes:len  (fn (Xs)     (%prim:bytes-len Xs)))
+(def bytes:new  (fn (n)      (%prim:bytes-new n)))
+(def bytes:get  (fn (xs i)   (%prim:bytes-get xs i)))
+(def bytes:set! (fn (xs i v) (%prim:bytes-set! xs i v)))
+(def bytes:len  (fn (xs)     (%prim:bytes-len xs)))
 
 
-;; Read
+;; read
 ;; =====================================
 
-(def read:str (fn (S) (%prim:read-str S)))
+(def read:str (fn (s) (%prim:read-str s)))
 
 
-;; I/O
+;; i/o
 ;; =====================================
 
-(def FD-STDIN  0)
-(def FD-STDOUT 1)
-(def FD-STDERR 2)
+(def fd-stdin  0)
+(def fd-stdout 1)
+(def fd-stderr 2)
 
 (def io:getc
-     (fn (FD) (%prim:getc FD)))
+     (fn (fd) (%prim:getc fd)))
 
 (def io:putc
-     (fn (FD C) (%prim:putc FD C)))
+     (fn (fd c) (%prim:putc fd c)))
 
 (def getc
-     (fn () (%prim:getc FD-STDIN)))
+     (fn () (%prim:getc fd-stdin)))
 
 (def putc
-     (fn (C) (%prim:putc FD-STDOUT C)))
+     (fn (c) (%prim:putc fd-stdout c)))
 
 (def c:newline 10)
 
@@ -270,475 +270,475 @@
      (fn () (putc c:space)))
 
 (def io:print
-     (fn (FD S) (%prim:print FD S)))
+     (fn (fd s) (%prim:print fd s)))
 
 (def prin1
-     (fn (X)
-       (io:print FD-STDOUT (str X))
-       X))
+     (fn (x)
+       (io:print fd-stdout (str x))
+       x))
 
 (def print
-     (fn (X)
-       (prin1 X)
+     (fn (x)
+       (prin1 x)
        (newline)
-       X))
+       x))
 
 (def prn
-     (fn Args
-       (list:each Args (fn (X) (prin1 X) (space)))
+     (fn args
+       (list:each args (fn (x) (prin1 x) (space)))
        (newline)
-       (car Args)))
+       (car args)))
 
 (def file:read-text
-     (fn (FName)
-       (%prim:read-text-file FName)))
+     (fn (fname)
+       (%prim:read-text-file fname)))
 
 (def file:write-text
-     (fn (FName Str)
-       (%prim:write-text-file FName Str)))
+     (fn (fname str)
+       (%prim:write-text-file fname str)))
 
 
-;; Network
+;; network
 ;; =====================================
-(def sock:make   (fn (Port) (%prim:socket-make Port)))
-(def sock:listen (fn (SockFD Limit) (%prim:socket-listen SockFD Limit)))
-(def sock:send   (fn (SockFD Str) (%prim:socket-send SockFD Str)))
-(def sock:accept (fn (SockFD ) (%prim:socket-accept SockFD)))
-(def sock:recv   (fn (SockFD Limit) (%prim:socket-recv SockFD Limit)))
-(def sock:close  (fn (SockFD) (%prim:socket-close SockFD)))
+(def sock:make   (fn (port) (%prim:socket-make port)))
+(def sock:listen (fn (sockfd limit) (%prim:socket-listen sockfd limit)))
+(def sock:send   (fn (sockfd str) (%prim:socket-send sockfd str)))
+(def sock:accept (fn (sockfd ) (%prim:socket-accept sockfd)))
+(def sock:recv   (fn (sockfd limit) (%prim:socket-recv sockfd limit)))
+(def sock:close  (fn (sockfd) (%prim:socket-close sockfd)))
 
 
-;; Macro System
+;; macro system
 ;; =====================================
 
-(def macro:SYNTAX-DICT (dict:new))
-(def macro:MACRO-DICT (dict:new))
-(def macro:DEBUG nil)
+(def macro:syntax-dict (dict:new))
+(def macro:macro-dict (dict:new))
+(def macro:debug nil)
 
 (def expand-macro-1 nil) ;; for recursion
 
 
-;; ===== Syntax =====
+;; ===== syntax =====
 
 (def macro:aux-rec
-     (fn (Counter)
-       (fn (Expr)
-         (expand-macro-1 Counter Expr))))
+     (fn (counter)
+       (fn (expr)
+         (expand-macro-1 counter expr))))
 
 (dict:set!
- macro:SYNTAX-DICT
+ macro:syntax-dict
  'let
- (fn (Counter Expr)
-   (let ((Binds (car Expr))
-         (Body  (cdr Expr))
-         (F (macro:aux-rec Counter))
-         (Binds (list:map Binds (fn (X) (list (car X) (F (second X))))))
-         (Body (list:map Body F)))
-     (cons 'let (cons Binds Body)))))
+ (fn (counter expr)
+   (let ((binds (car expr))
+         (body  (cdr expr))
+         (f (macro:aux-rec counter))
+         (binds (list:map binds (fn (x) (list (car x) (f (second x))))))
+         (body (list:map body f)))
+     (cons 'let (cons binds body)))))
 
 (dict:set!
- macro:SYNTAX-DICT
+ macro:syntax-dict
  'if
- (fn (Counter Expr)
-   (let ((F    (macro:aux-rec Counter))
-         (Cond (F (car Expr)))
-         (Then (F (second Expr)))
-         (Else (F (third Expr))))
-     (list 'if Cond Then Else))))
+ (fn (counter expr)
+   (let ((f    (macro:aux-rec counter))
+         (cond (f (car expr)))
+         (then (f (second expr)))
+         (else (f (third expr))))
+     (list 'if cond then else))))
 
 (dict:set!
- macro:SYNTAX-DICT
+ macro:syntax-dict
  'set!
- (fn (Counter Expr)
-   (let ((F   (macro:aux-rec Counter))
-         (Var (car Expr))
-         (Val (F (second Expr))))
-     (list 'set! Var Val))))
+ (fn (counter expr)
+   (let ((f   (macro:aux-rec counter))
+         (var (car expr))
+         (val (f (second expr))))
+     (list 'set! var val))))
 
 (dict:set!
- macro:SYNTAX-DICT
+ macro:syntax-dict
  'fn
- (fn (Counter Expr)
-   (let ((F    (macro:aux-rec Counter))
-         (Vars (car Expr))
-         (Body (list:map (cdr Expr) F)))
-     (cons 'fn (cons Vars Body)))))
+ (fn (counter expr)
+   (let ((f    (macro:aux-rec counter))
+         (vars (car expr))
+         (body (list:map (cdr expr) f)))
+     (cons 'fn (cons vars body)))))
 
 (dict:set!
- macro:SYNTAX-DICT
+ macro:syntax-dict
  'def
- (fn (Counter Expr)
-   (let ((F   (macro:aux-rec Counter))
-         (Var (car Expr))
-         (Val (F (second Expr))))
-     (list 'def Var Val))))
+ (fn (counter expr)
+   (let ((f   (macro:aux-rec counter))
+         (var (car expr))
+         (val (f (second expr))))
+     (list 'def var val))))
 
 (dict:set!
- macro:SYNTAX-DICT
+ macro:syntax-dict
  'quote
- (fn (Counter Expr)
-   (cons 'quote Expr)))
+ (fn (counter expr)
+   (cons 'quote expr)))
 
 (dict:set!
- macro:SYNTAX-DICT
+ macro:syntax-dict
  'apply
- (fn (Counter Expr)
-   (let ((F (macro:aux-rec Counter)))
+ (fn (counter expr)
+   (let ((f (macro:aux-rec counter)))
      (list 'apply
-           (F (car Expr))
-           (F (second Expr))))))
+           (f (car expr))
+           (f (second expr))))))
 
 (dict:set!
- macro:SYNTAX-DICT
+ macro:syntax-dict
  'catch
- (fn (Counter Expr)
-   (let ((F (macro:aux-rec Counter)))
+ (fn (counter expr)
+   (let ((f (macro:aux-rec counter)))
      (list 'catch
-           (F (car Expr))
-           (F (second Expr))))))
+           (f (car expr))
+           (f (second expr))))))
 
 
 ;; ===== demac =====
 
 (dict:set!
- macro:MACRO-DICT
+ macro:macro-dict
  'demac
- (fn (Def . Body)
-   ;; (demacro (Name . Args) . Body)
-   ;; => (dict:set! macro:MACRO-DICT (quote . Name) (fn Args . Body))
-   (let ((Name (car Def))
-         (Args (cdr Def)))
-     (list 'dict:set! 'macro:MACRO-DICT
-           (cons 'quote Name)
-           (cons 'fn (cons Args Body))))))
+ (fn (def . body)
+   ;; (demacro (name . args) . body)
+   ;; => (dict:set! macro:macro-dict (quote . name) (fn args . body))
+   (let ((name (car def))
+         (args (cdr def)))
+     (list 'dict:set! 'macro:macro-dict
+           (cons 'quote name)
+           (cons 'fn (cons args body))))))
 
 
 ;; ===== expand =====
 
 (set! expand-macro-1
-      (fn (Counter Expr)
-        (if (pair? Expr)
-            (let ((X  (car Expr))
-                  (Xs (cdr Expr))
-                  (Syntax (dict:get macro:SYNTAX-DICT X))
-                  (Macro  (dict:get macro:MACRO-DICT X)))
-              (if Syntax
-                  (Syntax Counter Xs)
-                  (if Macro
+      (fn (counter expr)
+        (if (pair? expr)
+            (let ((x  (car expr))
+                  (xs (cdr expr))
+                  (syntax (dict:get macro:syntax-dict x))
+                  (macro  (dict:get macro:macro-dict x)))
+              (if syntax
+                  (syntax counter xs)
+                  (if macro
                       (let ()
-                        (Counter)
-                        (apply Macro Xs))
-                      (cons (expand-macro-1 Counter X)
-                            (list:map Xs (fn (X) (expand-macro-1 Counter X)))))))
-            Expr)))
+                        (counter)
+                        (apply macro xs))
+                      (cons (expand-macro-1 counter x)
+                            (list:map xs (fn (x) (expand-macro-1 counter x)))))))
+            expr)))
 
 (def expand-macro
-     (fn (Expr)
-       (let ((Count 1)
-             (Counter (fn () (set! Count (+ Count 1))))
+     (fn (expr)
+       (let ((count 1)
+             (counter (fn () (set! count (+ count 1))))
              (loop nil))
          (set! loop
-               (fn (Expr)
-                 (if (> Count 0)
+               (fn (expr)
+                 (if (> count 0)
                    (let ()
-                     (set! Count 0)
-                     (loop (expand-macro-1 Counter Expr)))
-                   Expr)))
-         (loop Expr))))
+                     (set! count 0)
+                     (loop (expand-macro-1 counter expr)))
+                   expr)))
+         (loop expr))))
 
 (set! %pre-eval
-      (fn (Expr)
-        (let ((Expanded (expand-macro Expr)))
-          (if macro:DEBUG (print (list 'expanded Expanded)))
-          Expanded)))
+      (fn (expr)
+        (let ((expanded (expand-macro expr)))
+          (if macro:debug (print (list 'expanded expanded)))
+          expanded)))
 
 
-;; Macros
+;; macros
 ;; =====================================
 
-(demac (and . Xs)
+(demac (and . xs)
   (let ((rec nil))
     (set! rec
-          (fn (Xs)
-            (if Xs
-                (list 'if (car Xs) (cons 'and (cdr Xs)) nil)
+          (fn (xs)
+            (if xs
+                (list 'if (car xs) (cons 'and (cdr xs)) nil)
                 true)))
-    (rec Xs)))
+    (rec xs)))
 
-(demac (or . Xs)
+(demac (or . xs)
   (let ((rec nil))
     (set! rec
-          (fn (Xs)
-            (if Xs
-                (list 'if (car Xs) true (cons 'or (cdr Xs)))
+          (fn (xs)
+            (if xs
+                (list 'if (car xs) true (cons 'or (cdr xs)))
                 nil)))
-    (rec Xs)))
+    (rec xs)))
 
 
-;; Simple quasiquote expander
-;; Do not nest.
-(demac (quasiquote . Expr)
+;; simple quasiquote expander
+;; do not nest.
+(demac (quasiquote . expr)
   (let ((qq-object nil)
         (qq-pair nil)
         (qq-list nil))
     (set!
      qq-object
-     (fn (X)
-       (if (pair? X)
-           (qq-list X)
-           (cons 'quote X))))
+     (fn (x)
+       (if (pair? x)
+           (qq-list x)
+           (cons 'quote x))))
     (set!
      qq-pair
-     (fn (Xs)
-       (if (= (car Xs) 'unquote)
-           (cdr Xs)
-           (qq-list Xs))))
+     (fn (xs)
+       (if (= (car xs) 'unquote)
+           (cdr xs)
+           (qq-list xs))))
     (set!
      qq-list
-     (fn (Xs)
-       (if (pair? Xs)
-           (let ((F    (car Xs))
-                 (Rest (cdr Xs)))
-             (if (= F 'unquote)
-                 ;; Xs: (unquote . Rest)
-                 Rest
-                 (if (and (pair? F)
-                          (= (car F) 'unquote-splicing))
-                     ;; Xs: ((unquote-splicing . X) . Rest)
-                     (list 'list:concat (cdr F) (qq-list Rest))
-                     (list 'cons (qq-object F) (qq-list Rest)))))
-           (cons 'quote Xs))))
-    (qq-object Expr)))
+     (fn (xs)
+       (if (pair? xs)
+           (let ((f    (car xs))
+                 (rest (cdr xs)))
+             (if (= f 'unquote)
+                 ;; xs: (unquote . rest)
+                 rest
+                 (if (and (pair? f)
+                          (= (car f) 'unquote-splicing))
+                     ;; xs: ((unquote-splicing . x) . rest)
+                     (list 'list:concat (cdr f) (qq-list rest))
+                     (list 'cons (qq-object f) (qq-list rest)))))
+           (cons 'quote xs))))
+    (qq-object expr)))
 
 
-(demac (letrec Binds . Body)
-  ;; (letrec ((F Fn) ...) . Body)
-  ;; => (let ((F nil)) (set! F Fn) . Body)
-  (let ((Defs (list:map Binds (fn (X) `(,(car X) nil))))
-        (Sets (list:map Binds (fn (X) `(set! ,(car X) ,(second X))))))
-    `(let ,Defs ,@Sets ,@Body)))
+(demac (letrec binds . body)
+  ;; (letrec ((f fn) ...) . body)
+  ;; => (let ((f nil)) (set! f fn) . body)
+  (let ((defs (list:map binds (fn (x) `(,(car x) nil))))
+        (sets (list:map binds (fn (x) `(set! ,(car x) ,(second x))))))
+    `(let ,defs ,@sets ,@body)))
 
 
-(demac (loop Name Binds . Body)
-  ;; (loop Name ((Var Val) ...) . Body)
-  ;; => (letrec ((Name (fn (Var ...) . Body))) (Name Val ...))
-  (let ((Vars (list:map Binds car))
-        (Vals (list:map Binds second)))
-    `(letrec ((,Name (fn ,Vars ,@Body))) (,Name ,@Vals))))
+(demac (loop name binds . body)
+  ;; (loop name ((var val) ...) . body)
+  ;; => (letrec ((name (fn (var ...) . body))) (name val ...))
+  (let ((vars (list:map binds car))
+        (vals (list:map binds second)))
+    `(letrec ((,name (fn ,vars ,@body))) (,name ,@vals))))
 
 
-(demac (when Cond . Body)
-  `(if ,Cond (let () ,@Body)))
+(demac (when cond . body)
+  `(if ,cond (let () ,@body)))
 
-(demac (unless Cond . Body)
-  `(if ,Cond nil (let () ,@Body)))
-
-
-(demac (de Def . Body)
-  (let ((Name  (car Def))
-        (Args  (cdr Def)))
-    `(def ,Name ,(cons 'fn (cons Args Body)))))
+(demac (unless cond . body)
+  `(if ,cond nil (let () ,@body)))
 
 
-(demac (cond Clause . Clauses)
+(demac (de def . body)
+  (let ((name  (car def))
+        (args  (cdr def)))
+    `(def ,name ,(cons 'fn (cons args body)))))
+
+
+(demac (cond clause . clauses)
   (letrec
-      ((Rec (fn (Clause Clauses)
-            (let ((Cond (car Clause))
-                  (Body (cdr Clause))
-                  (Rest (if Clauses (Rec (car Clauses) (cdr Clauses)) nil)))
-              `(if ,Cond (let () ,@Body) ,Rest)))))
-    (Rec Clause Clauses)))
+      ((rec (fn (clause clauses)
+            (let ((cond (car clause))
+                  (body (cdr clause))
+                  (rest (if clauses (rec (car clauses) (cdr clauses)) nil)))
+              `(if ,cond (let () ,@body) ,rest)))))
+    (rec clause clauses)))
 
 
-;; Gensym
+;; gensym
 ;; =====================================
-(def sym:GENSYM-COUNTER
-     (let ((I 0))
-       (fn () (set! I (+ I 1)))))
+(def sym:gensym-counter
+     (let ((i 0))
+       (fn () (set! i (+ i 1)))))
 
 (de (sym:gen)
-  (sym:new (str "#g:" (sym:GENSYM-COUNTER))))
+  (sym:new (str "#g:" (sym:gensym-counter))))
 
 
-;; System
+;; system
 ;; =====================================
 
-(de (exit Code)
-  (%prim:exit (if Code Code 0)))
+(de (exit code)
+  (%prim:exit (if code code 0)))
 
 (de (sys:gc)
   (%prim:gc))
 
-(de (sys:load FName)
-  (%prim:load-file FName))
+(de (sys:load fname)
+  (%prim:load-file fname))
 
-(de (sys:load-files Files)
-  (list:each Files sys:load))
+(de (sys:load-files files)
+  (list:each files sys:load))
 
 
-;; Array 2
+;; array 2
 ;; =====================================
 
-(de (array:each Xs F)
-  (let ((Len (array:len Xs)))
-    (loop rec ((I 0))
-      (when (> Len I)
-        (F (array:get Xs I) I)
-        (rec (inc I))))
-    Xs))
+(de (array:each xs f)
+  (let ((len (array:len xs)))
+    (loop rec ((i 0))
+      (when (> len i)
+        (f (array:get xs i) i)
+        (rec (inc i))))
+    xs))
 
-(de (array:each-back Xs F)
-  (loop rec ((I (dec (array:len Xs))))
-    (when (> I -1)
-      (F (array:get Xs I) I)
-      (rec (dec I))))
-  Xs)
+(de (array:each-back xs f)
+  (loop rec ((i (dec (array:len xs))))
+    (when (> i -1)
+      (f (array:get xs i) i)
+      (rec (dec i))))
+  xs)
 
-(de (array:list Xs)
-  (let ((Acc nil))
-    (array:each-back Xs (fn (X) (set! Acc (cons X Acc))))
-    Acc))
+(de (array:list xs)
+  (let ((acc nil))
+    (array:each-back xs (fn (x) (set! acc (cons x acc))))
+    acc))
 
 
-;; Bytes 2
+;; bytes 2
 ;; =====================================
 
-(de (bytes:each Xs F)
-  (let ((Len (bytes:len Xs)))
-    (loop rec ((I 0))
-      (when (> Len I)
-        (F (bytes:get Xs I) I)
-        (rec (inc I))))
-    Xs))
+(de (bytes:each xs f)
+  (let ((len (bytes:len xs)))
+    (loop rec ((i 0))
+      (when (> len i)
+        (f (bytes:get xs i) i)
+        (rec (inc i))))
+    xs))
 
-(de (bytes:each-back Xs F)
-  (loop rec ((I (dec (bytes:len Xs))))
-    (when (> I -1)
-      (F (bytes:get Xs I) I)
-      (rec (dec I))))
-  Xs)
+(de (bytes:each-back xs f)
+  (loop rec ((i (dec (bytes:len xs))))
+    (when (> i -1)
+      (f (bytes:get xs i) i)
+      (rec (dec i))))
+  xs)
 
-(de (bytes:list Xs)
-  (let ((Acc nil))
-    (bytes:each-back Xs (fn (X) (set! Acc (cons X Acc))))
-    Acc))
+(de (bytes:list xs)
+  (let ((acc nil))
+    (bytes:each-back xs (fn (x) (set! acc (cons x acc))))
+    acc))
 
 
-;; Pair 2
+;; pair 2
 ;; =====================================
 
-(de (list:reverse! Xs)
+(de (list:reverse! xs)
   ;; in-place
-  (let ((Last nil)
-        (Next nil))
-    (loop rec ((Xs Xs))
-      (when Xs
-        (set! Next (cdr Xs))
-        (set-cdr! Xs Last)
-        (set! Last Xs)
-        (rec Next)))
-    Last))
+  (let ((last nil)
+        (next nil))
+    (loop rec ((xs xs))
+      (when xs
+        (set! next (cdr xs))
+        (set-cdr! xs last)
+        (set! last xs)
+        (rec next)))
+    last))
 
-(de (list:reverse Xs)
-  (loop rec ((Xs Xs) (Acc nil))
-    (if Xs
-      (rec (cdr Xs) (cons (car Xs) Acc))
-      Acc)))
+(de (list:reverse xs)
+  (loop rec ((xs xs) (acc nil))
+    (if xs
+      (rec (cdr xs) (cons (car xs) acc))
+      acc)))
 
-(de (list:cons* X . Xs)
+(de (list:cons* x . xs)
   ;; (cons* 1 2 3) => (1 2 . 3)
   ;; (cons* 1 2 '(3 4)) => (1 2 3 4)
-  (if Xs
-      (if (and (pair? (car Xs)) (not (cdr Xs)))
-          (cons X (car Xs))
-          (cons X (apply list:cons* Xs)))
-      X))
+  (if xs
+      (if (and (pair? (car xs)) (not (cdr xs)))
+          (cons x (car xs))
+          (cons x (apply list:cons* xs)))
+      x))
 
 
-;; String 2
+;; string 2
 ;; =====================================
 
-(de (str:chars S)
-  (let ((Len (str:len S))
-        (Xs  (array:new Len)))
-    (loop rec ((I 0))
-      (when (> Len I)
-        (array:set! Xs I (str:get S I))
-        (rec (inc I))))
-    Xs))
+(de (str:chars s)
+  (let ((len (str:len s))
+        (xs  (array:new len)))
+    (loop rec ((i 0))
+      (when (> len i)
+        (array:set! xs i (str:get s i))
+        (rec (inc i))))
+    xs))
 
-(de (str:split1 Src What)
-  ;; nil | (Former . Latter)
-  (let ((SLen (str:len Src))
-        (WLen (str:len What))
-        (I    (str:index Src What)))
-    (if (nil? I) nil
-        (cons (str:sub Src 0 I)
-              (let ((Next (+ I WLen)))
-                (if (>= Next SLen)
+(de (str:split1 src what)
+  ;; nil | (former . latter)
+  (let ((slen (str:len src))
+        (wlen (str:len what))
+        (i    (str:index src what)))
+    (if (nil? i) nil
+        (cons (str:sub src 0 i)
+              (let ((next (+ i wlen)))
+                (if (>= next slen)
                     ""
-                    (str:sub Src Next SLen)))))))
+                    (str:sub src next slen)))))))
 
-(de (str:split Src What)
-  ;; (List Of Splitted Strings)
-  (loop rec ((Acc nil) (Src Src))
-    (let ((S (str:split1 Src What)))
-      (if S
-          (rec (cons (car S) Acc)
-               (cdr S))
-          (list:reverse! (cons Src Acc))))))
+(de (str:split src what)
+  ;; (list of splitted strings)
+  (loop rec ((acc nil) (src src))
+    (let ((s (str:split1 src what)))
+      (if s
+          (rec (cons (car s) acc)
+               (cdr s))
+          (list:reverse! (cons src acc))))))
 
-(de (str:join Xs What)
-  ;; (List Of String) => "ListWhatOfWhatString"
-  (loop rec ((X (car Xs)) (Xs (cdr Xs)))
-    (if Xs
-      (str X What (rec (car Xs) (cdr Xs)))
-      (str X))))
+(de (str:join xs what)
+  ;; (list of string) => "listwhatofwhatstring"
+  (loop rec ((x (car xs)) (xs (cdr xs)))
+    (if xs
+      (str x what (rec (car xs) (cdr xs)))
+      (str x))))
 
 
 ;; record-case
 ;; =====================================
 ;; (record-case (list 'foo 1 2)
-;;   ((foo A B) (+ A B))
+;;   ((foo a b) (+ a b))
 ;;   (else ...))
 
-(demac (record-case Record . Clauses)
-  (let ((Xs   (sym:gen))
-        (Sign (sym:gen))
-        (Vals (sym:gen)))
-    (letrec ((Expand
-              (fn (Cs)
-                (if Cs
-                  (let ((Clause (car Cs))
-                        (Rest   (Expand (cdr Cs)))
-                        (Match  (car Clause))
-                        (Body   (cdr Clause)))
-                    (if (= Match 'else)
-                      `(let () ,@Body)
-                      (let ((Op     (car Match))
-                            (Binds  (cdr Match)))
-                        `(if (= ,Sign ',Op)
-                           (apply (fn ,Binds ,@Body) ,Vals)
-                           ,Rest))))
-                  `(raise (list 'record-unmatched ,Xs))))))
-      `(let ((,Xs   ,Record)
-             (,Sign (car ,Xs))
-             (,Vals (cdr ,Xs)))
-         ,(Expand Clauses)))))
+(demac (record-case record . clauses)
+  (let ((xs   (sym:gen))
+        (sign (sym:gen))
+        (vals (sym:gen)))
+    (letrec ((expand
+              (fn (cs)
+                (if cs
+                  (let ((clause (car cs))
+                        (rest   (expand (cdr cs)))
+                        (match  (car clause))
+                        (body   (cdr clause)))
+                    (if (= match 'else)
+                      `(let () ,@body)
+                      (let ((op     (car match))
+                            (binds  (cdr match)))
+                        `(if (= ,sign ',op)
+                           (apply (fn ,binds ,@body) ,vals)
+                           ,rest))))
+                  `(raise (list 'record-unmatched ,xs))))))
+      `(let ((,xs   ,record)
+             (,sign (car ,xs))
+             (,vals (cdr ,xs)))
+         ,(expand clauses)))))
 
 
-;; Threading macros
+;; threading macros
 ;; =====================================
-(demac (-> Arg F . Rest)
+(demac (-> arg f . rest)
   (letrec
-      ((Rec
-        (fn (Arg F Rest)
-          (let ((Wrapped
+      ((rec
+        (fn (arg f rest)
+          (let ((wrapped
                  (cond
-                  ((symbol? F) (list F Arg))
-                  ((pair? F)   `(,(car F) ,Arg ,@(cdr F)))
-                  (else        (raise `(in -> ,F should be symbol or pair))))))
-            (if Rest
-              (Rec Wrapped (car Rest) (cdr Rest))
-              Wrapped)))))
-    (Rec Arg F Rest)))
+                  ((symbol? f) (list f arg))
+                  ((pair? f)   `(,(car f) ,arg ,@(cdr f)))
+                  (else        (raise `(in -> ,f should be symbol or pair))))))
+            (if rest
+              (rec wrapped (car rest) (cdr rest))
+              wrapped)))))
+    (rec arg f rest)))
