@@ -38,14 +38,14 @@
          html
          "\r\n\r\n")))
 
-(def html:200 "200 ok")
-(def html:404 "404 not found")
+(de html:200 "200 ok")
+(de html:404 "404 not found")
 
 
 ;; ===== example application =====
 
-(def app:message "hello")
-(def app:dev? true)
+(de app:message "hello")
+(de app:dev? true)
 
 (de (app:dev:reqs req)
   (str
@@ -70,17 +70,17 @@
 (de (title s)
   (str "<h1>" s "</h1>"))
 
-(def menu
-     (str
-      "<p>"
-      (str:join
-       (list:map
-        '(("/"            "root")
-          ("/hello"       "hello")
-          ("/hello/world" "hello-world"))
-        (fn (x) (str "<a href=\"" (car x) "\">" (second x) "</a>")))
-       " | ")
-      "</p>"))
+(de menu
+  (str
+   "<p>"
+   (str:join
+    (list:map
+     '(("/"            "root")
+       ("/hello"       "hello")
+       ("/hello/world" "hello-world"))
+     (fn (x) (str "<a href=\"" (car x) "\">" (second x) "</a>")))
+    " | ")
+   "</p>"))
 
 (de (handle-hello req)
   (prn "handle: hello")
@@ -111,7 +111,7 @@
   (-> (str (title "404 not found"))
       (app:res req html:404)))
 
-(def app:handlers
+(de app:handlers
   (list
    (cons "/hello"       handle-hello)
    (cons "/hello/world" handle-hello-world)

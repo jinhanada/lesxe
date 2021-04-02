@@ -535,9 +535,11 @@
 
 
 (demac (de def . body)
-  (let ((name  (car def))
-        (args  (cdr def)))
-    `(def ,name ,(cons 'fn (cons args body)))))
+  (if (pair? def)
+    (let ((name  (car def))
+          (args  (cdr def)))
+      `(def ,name ,(cons 'fn (cons args body))))
+    `(def ,def ,(car body))))
 
 
 (demac (cond clause . clauses)
