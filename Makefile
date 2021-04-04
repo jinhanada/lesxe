@@ -36,7 +36,11 @@ clean:
 
 
 .PHONY: install
+install: ~/bin/lesxe
+
+~/bin/lesxe: $(BIN)/lesxe
 	cp $(BIN)/lesxe ~/bin/
+
 
 
 .PHONY: memcheck
