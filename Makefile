@@ -35,6 +35,10 @@ clean:
 	rm -f $(OUT)/* $(BIN)/lesxe
 
 
+.PHONY: install
+	cp $(BIN)/lesxe ~/bin/
+
+
 .PHONY: memcheck
 memcheck: all test
 	valgrind \
@@ -42,6 +46,14 @@ memcheck: all test
 		--leak-check=full \
 		--log-file=out/valgrind.log \
 		./out/test_lesxe
+
+.PHONY: memcheck-le
+memcheck-le: all
+	valgrind \
+		--tool=memcheck \
+		--leak-check=full \
+		--log-file=out/valgrind.log \
+		$(BIN)/lesxe test/all.le
 
 
 .PHONY: run

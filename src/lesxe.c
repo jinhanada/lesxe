@@ -114,7 +114,7 @@ struct LeObj {
     Array   Array;
     Symbol  Symbol;
     Pair    Pair;
-    Func Func;
+    Func    Func;
     Bytes   Bytes;
     Root    Root;
   };
@@ -148,7 +148,17 @@ struct LeVM {
   int replBufSize;
 };
 
-  
+
+// Defensive Code
+// =============================================================================
+
+#ifdef __NO_DEFENSIVE__
+#  define Defense(code)
+#else
+#  define Defense(code) (code)
+#endif
+
+
 // Shorthands
 // =============================================================================
 // いくつかのマクロはLeVM* vmやint codeの定義を前提としている
@@ -182,6 +192,7 @@ typedef uint8_t  Byte;
 // =============================================================================
 static char* toStr(Obj);
 static void setupVM(LeVM* vm);
+
 
 // Debug print
 // =============================================================================
@@ -471,30 +482,48 @@ Public void le_restore_stack(LeVM* vm, int index) {
 // ===== For debug GC =====
 
 static int objInNew(LeVM* vm, Obj obj) {
-  return vm->new[0] <= obj && obj < vm->new[vm->cells];
+  return (Obj)vm->new <= obj && obj < (Obj)(vm->new + vm->cells);
 }
 
-static void assertAlive(LeVM* vm, Obj x) {
-  if (!le_is_obj(x) || objInNew(vm, x)) return;
-  DIE("old obj %p", x);
+static int objInOld(LeVM* vm, Obj obj) {
+  return (Obj)vm->old <= obj && obj < (Obj)(vm->old + vm->cells);
 }
 
-static void assertAllAlive(LeVM* vm) {
+static int validObj(LeVM* vm, Obj obj) {
+  return obj == nil ||
+    le_is_num(obj) ||
+    (objInNew(vm, obj) || objInOld(vm, obj));
+}
+
+static int assertValidObj(LeVM* vm, Obj obj, char* filename, int line) {
+  if (validObj(vm, obj)) return 1;
+  debugPrint(filename, line, "failed: assertValidObj(%p)", obj);
+  exit(1);
+  return 0;
+}
+
+#define AssertValid(obj) Defense(assertValidObj(vm, obj, __FILE__, __LINE__))
+
+typedef void(*ObjIter)(LeVM* vm, Obj obj);
+
+static void iterateObjInNew(LeVM* vm, ObjIter iter) {
   vm->scanned = vm->new;
+
   while (vm->scanned < vm->here) {
     Obj  obj    = (Obj)vm->scanned;
     Cell cells  = cellsOf(obj->header);
     Cell actual = cells + OBJECT_HEADER_CELLS;
     vm->scanned += actual;
-
-    // no need to check
-    if (isBytes(obj->header)) continue;
-
-    // check
-    for (int i = 0; i < cells; i++) {
-      assertAlive(vm, obj->Array.data[i]);
-    }
+    iter(vm, obj);
   }
+}
+
+static void checkNewObjHeader(LeVM* vm, Obj obj) {
+  assert(!isMoved(obj->header));
+}
+
+static void checkAllNewObj(LeVM* vm) {
+  iterateObjInNew(vm, checkNewObjHeader);
 }
 
 
@@ -519,10 +548,16 @@ static Obj memMove(LeVM* vm, Obj obj) {
   Cell actual = cells + OBJECT_HEADER_CELLS;
   Obj  src    = obj;
   Obj  dst    = (Obj)vm->here;
+  int  bytesp = isBytes(obj->header); // bytes? for debug
   vm->here += actual;
-  
-  for (int i = 0; i < actual; i++) {
-    dst[i] = src[i];
+
+  dst->header = obj->header;
+  dst->hash   = obj->hash;
+
+  for (int i = 0; i < cells; i++) {
+    Obj x = src->Array.data[i];
+    Defense(bytesp || AssertValid(x));
+    dst->Array.data[i] = x;
   }
 
   obj->header = (Cell)dst;
@@ -534,7 +569,7 @@ static Obj memMove(LeVM* vm, Obj obj) {
 // ===== GC entry point =====
 
 Public void le_gc(LeVM* vm) {
-  if (!vm->root) DIE("GC: no root");
+  if (!vm->root) DIE("GC: no root");  
   memSwap(vm);
 
   // move root
@@ -546,9 +581,9 @@ Public void le_gc(LeVM* vm) {
   }
 
   // interpreter
-  vm->env       = memMove(vm, vm->env);
-  vm->result    = memMove(vm, vm->result);
-  vm->err       = memMove(vm, vm->err);
+  vm->env    = memMove(vm, vm->env);
+  vm->result = memMove(vm, vm->result);
+  vm->err    = memMove(vm, vm->err);
 
   // Symbol Table
   for (int i = 0; i < SymTableSize; i++) {
@@ -569,9 +604,12 @@ Public void le_gc(LeVM* vm) {
     // move contents
     for (int i = 0; i < cells; i++) {
       Obj x = obj->Array.data[i];
-      obj->Array.data[i] = memMove(vm, obj->Array.data[i]);
+      obj->Array.data[i] = memMove(vm, x);
     }
   }
+
+  // check
+  Defense(checkAllNewObj(vm));
 }
 
 
@@ -639,6 +677,7 @@ Public int le_array_len(Obj xs) {
 // ===== Pair =====
 
 Public Obj le_cons(LeVM* vm, Obj a, Obj b) {
+  AssertValid(a); AssertValid(b);
   Push(b);
   Push(a);
   Obj xs = newObj(vm, 2, T_PAIR);
@@ -948,9 +987,11 @@ static void toStrSub(Str* s, Obj x) {
   case Le_func:
     return putStr(s, "#<Func>");
   case Le_array:
-    putStr(s, "#<Array ");
-    toStrSub(s, le_int2obj(le_array_len(x)));
-    return putStr(s, ">");
+    {
+      putStr(s, "#<Array ");
+      toStrSub(s, le_int2obj(le_array_len(x)));
+      return putStr(s, ">");
+    }
   case Le_bytes:
     putStr(s, "#<Bytes ");
     toStrSub(s, le_int2obj(le_bytes_len(x)));
@@ -1667,6 +1708,7 @@ static int primArrayNew(LeVM* vm, Obj args) {
   Obj x = Car(args);
   ExpectType(num, x);
   int len = le_obj2int(x);
+  Defense(assert(len >0));
   vm->result = le_new_array(vm, len);
   return Le_OK;
 }
@@ -1691,7 +1733,7 @@ static int primArraySet(LeVM* vm, Obj args) {
   ExpectType(num, obj_i);
   int i = le_obj2int(obj_i);
   if (i < 0 || i >= le_array_len(xs))
-    return RaiseWith(OutOfRange, args);  
+    return RaiseWith(OutOfRange, args);
   xs->Array.data[i] = val;
   vm->result = xs;
   return Le_OK;
@@ -1791,7 +1833,7 @@ static int primStrCat(LeVM* vm, Obj args) {
   SaveStack;
   Obj xs = Car(args);
   Push(xs);
-  int size = 0;
+  int size = 0; // null termination
 
   // アロケーションとコピー何度もやりたくないので、まず一回argsを見て
   // 合計サイズを先に出して文字列を作る
@@ -1815,7 +1857,6 @@ static int primStrCat(LeVM* vm, Obj args) {
     p += len;
     xs = Cdr(xs);
   }
-  str->Bytes.data[size] = '\0';
   vm->result = str;
   
   return Le_OK;
@@ -1859,7 +1900,7 @@ static int primStrMake(LeVM* vm, Obj args) {
     ExpectType(num, c);
     str->Bytes.data[i] = (char)(le_obj2int(c));
   }
-  str->Bytes.data[len] = '\0';
+
   vm->result = str;
   return Le_OK;
 }
@@ -1889,7 +1930,6 @@ static int primStrSub(LeVM* vm, Obj args) {
   Obj sub = le_new_str(vm, len);
   s = Pop();
   memcpy(le_cstr_of(sub), le_cstr_of(s) + start, len);
-  le_cstr_of(sub)[len] = '\0';
   
   vm->result = sub;
   return Le_OK;
@@ -2256,8 +2296,9 @@ static int buildLetEnv(LeVM* vm, Obj binds) {
   // inplace!
   // Restoreing vm->env is guaranteed by eval()
   SaveStack;
-  vm->env = le_cons(vm, nil, vm->env);
-
+  Push(binds);
+  vm->env = Cons(vm, nil, vm->env); // new env
+  binds = Pop();
   int code = Le_OK;
   while (binds) {
     Push(binds);
@@ -2290,8 +2331,10 @@ static int evalAux(LeVM* vm, Obj expr) {
     if (le_is_symbol(expr))
       return evalSymbol(vm, expr);
 
-    if (!le_is_pair(expr))
+    if (!le_is_pair(expr)) {
+      Defense(assert(!isMoved(expr->header)));
       DIE("Can't eval %s", toStr(expr));
+    }
   
     SaveStack;
     Obj first = Car(expr);
@@ -2334,14 +2377,13 @@ static int evalAux(LeVM* vm, Obj expr) {
       Obj binds = Car(rest);
       Obj body = Cdr(rest);
       Push(body);
-
+      
       code = buildLetEnv(vm, binds);
       if (code != Le_OK) RestoreReturn(code);
-  
+
       body = Pop();
       code = evalExprs(vm, body, &expr);
       ExpectOK;
-
       continue; // tail call!
     }
     
@@ -2393,6 +2435,7 @@ static int evalAux(LeVM* vm, Obj expr) {
 
 static int eval(LeVM* vm, Obj expr) {
   Push(vm->env);
+  AssertValid(expr);
   int code = evalAux(vm, expr);
   vm->env = Pop();
   return code;
