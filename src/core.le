@@ -545,36 +545,32 @@
           ;; collect internal defines
           (letrec-binds  nil)
           (rest-body     nil))
-      (letrec
-          ((collect (fn (body)
-                      (when body
-                        (let ((expr  (car body))
-                              (rest (cdr body)))
-                          (if (= 'de (car expr))
-                            (let ()
-                              (let ((defi (second expr))
-                                    (name (car defi))
-                                    (args (cdr defi))
-                                    (body (cddr expr)))
-                                (push! letrec-binds (list name `(fn ,args ,@body))))
-                              (collect rest))
-                            (set! rest-body body)))))))
-        (collect body)
-        (let ((f (if letrec-binds
-                   `(fn ,args (letrec ,letrec-binds ,@rest-body))
-                   `(fn ,args ,@rest-body))))
-          `(def ,name ,f))))
+      (loop collect ((body body))
+        (when body
+          (let ((expr  (car body))
+                (rest (cdr body)))
+            (if (= 'de (car expr))
+              (let ()
+                (let ((defi (second expr))
+                      (name (car defi))
+                      (args (cdr defi))
+                      (body (cddr expr)))
+                  (push! letrec-binds (list name `(fn ,args ,@body))))
+                (collect rest))
+              (set! rest-body body)))))
+      (let ((f (if letrec-binds
+                 `(fn ,args (letrec ,letrec-binds ,@rest-body))
+                 `(fn ,args ,@rest-body))))
+        `(def ,name ,f)))
     `(def ,defi ,(car body))))
 
 
 (demac (cond clause . clauses)
-  (letrec
-      ((rec (fn (clause clauses)
-            (let ((cond (car clause))
-                  (body (cdr clause))
-                  (rest (if clauses (rec (car clauses) (cdr clauses)) nil)))
-              `(if ,cond (let () ,@body) ,rest)))))
-    (rec clause clauses)))
+  (loop rec ((clause clause) (clauses clauses))
+    (let ((cond (car clause))
+          (body (cdr clause))
+          (rest (if clauses (rec (car clauses) (cdr clauses)) nil)))
+      `(if ,cond (let () ,@body) ,rest))))
 
 
 ;; gensym
@@ -732,40 +728,37 @@
 (demac (record-case record . clauses)
   (let ((xs   (sym:gen))
         (sign (sym:gen))
-        (vals (sym:gen)))
-    (letrec ((expand
-              (fn (cs)
-                (if cs
-                  (let ((clause (car cs))
-                        (rest   (expand (cdr cs)))
-                        (match  (car clause))
-                        (body   (cdr clause)))
-                    (if (= match 'else)
-                      `(let () ,@body)
-                      (let ((op     (car match))
-                            (binds  (cdr match)))
-                        `(if (= ,sign ',op)
-                           (apply (fn ,binds ,@body) ,vals)
-                           ,rest))))
-                  `(raise (list 'record-unmatched ,xs))))))
-      `(let ((,xs   ,record)
-             (,sign (car ,xs))
-             (,vals (cdr ,xs)))
-         ,(expand clauses)))))
+        (vals (sym:gen))
+        (expanded
+         (loop expand ((cs clauses))
+           (if cs
+             (let ((clause (car cs))
+                   (rest   (expand (cdr cs)))
+                   (match  (car clause))
+                   (body   (cdr clause)))
+               (if (= match 'else)
+                 `(let () ,@body)
+                 (let ((op     (car match))
+                       (binds  (cdr match)))
+                   `(if (= ,sign ',op)
+                      (apply (fn ,binds ,@body) ,vals)
+                      ,rest))))
+             `(raise (list 'record-unmatched ,xs))))))
+    `(let ((,xs   ,record)
+           (,sign (car ,xs))
+           (,vals (cdr ,xs)))
+       ,expanded)))
 
 
 ;; threading macros
 ;; =====================================
 (demac (-> arg f . rest)
-  (letrec
-      ((rec
-        (fn (arg f rest)
-          (let ((wrapped
-                 (cond
-                  ((symbol? f) (list f arg))
-                  ((pair? f)   `(,(car f) ,arg ,@(cdr f)))
-                  (else        (raise `(in -> ,f should be symbol or pair))))))
-            (if rest
-              (rec wrapped (car rest) (cdr rest))
-              wrapped)))))
-    (rec arg f rest)))
+  (loop rec ((arg arg) (f f) (rest rest))
+    (let ((wrapped
+           (cond
+            ((symbol? f) (list f arg))
+            ((pair? f)   `(,(car f) ,arg ,@(cdr f)))
+            (else        (raise `(in -> ,f should be symbol or pair))))))
+      (if rest
+        (rec wrapped (car rest) (cdr rest))
+        wrapped))))
