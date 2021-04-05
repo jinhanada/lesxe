@@ -534,12 +534,37 @@
   `(if ,cond nil (let () ,@body)))
 
 
-(demac (de def . body)
-  (if (pair? def)
-    (let ((name  (car def))
-          (args  (cdr def)))
-      `(def ,name ,(cons 'fn (cons args body))))
-    `(def ,def ,(car body))))
+(demac (push! xs x)
+  `(set! ,xs (cons ,x ,xs)))
+
+
+(demac (de defi . body)
+  (if (pair? defi)
+    (let ((name  (car defi))
+          (args  (cdr defi))
+          ;; collect internal defines
+          (letrec-binds  nil)
+          (rest-body     nil))
+      (letrec
+          ((collect (fn (body)
+                      (when body
+                        (let ((expr  (car body))
+                              (rest (cdr body)))
+                          (if (= 'de (car expr))
+                            (let ()
+                              (let ((defi (second expr))
+                                    (name (car defi))
+                                    (args (cdr defi))
+                                    (body (cddr expr)))
+                                (push! letrec-binds (list name `(fn ,args ,@body))))
+                              (collect rest))
+                            (set! rest-body body)))))))
+        (collect body)
+        (let ((f (if letrec-binds
+                   `(fn ,args (letrec ,letrec-binds ,@rest-body))
+                   `(fn ,args ,@rest-body))))
+          `(def ,name ,f))))
+    `(def ,defi ,(car body))))
 
 
 (demac (cond clause . clauses)
