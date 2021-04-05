@@ -550,7 +550,7 @@
         (when body
           (let ((expr  (car body))
                 (rest (cdr body)))
-            (if (= 'de (car expr))
+            (if (and (pair? expr) (= 'de (car expr)))
               (let ()
                 (let ((expr (expand-macro expr)) ;; for nested de
                       ;; expr: (def name (fn args . body))
