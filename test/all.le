@@ -75,7 +75,10 @@
 
 
 (de (internal-test)
-  (de (a n) (if (> n 10) n (b (+ n 1))))
+  (de (a n)
+    (de (a2)
+      (if (> n 10) n (b (+ n 1))))
+    (a2))
   (de (b n) (if (> n 10) n (a (+ n 1))))
   (a 1))
 
