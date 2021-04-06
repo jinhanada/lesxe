@@ -30,6 +30,11 @@ test: all $(OUT)/test_lesxe
 	$(BIN)/lesxe test/all.le
 
 
+.PHONY: test-le
+test-le: $(BIN)/lesxe
+	$(BIN)/lesxe test/all.le
+
+
 .PHONY: clean
 clean:
 	rm -f $(OUT)/* $(BIN)/lesxe

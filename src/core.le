@@ -44,6 +44,9 @@
 (def raise
      (fn (error) (%prim:raise error)))
 
+(def error
+     (fn errs (raise errs)))
+
 
 ;; array
 ;; =====================================
@@ -512,20 +515,27 @@
     (qq-object expr)))
 
 
+(demac (begin . body)
+  `(let () ,@body))
+
 (demac (letrec binds . body)
-  ;; (letrec ((f fn) ...) . body)
-  ;; => (let ((f nil)) (set! f fn) . body)
-  (let ((defs (list:map binds (fn (x) `(,(car x) nil))))
-        (sets (list:map binds (fn (x) `(set! ,(car x) ,(second x))))))
+  ;; (letrec ((f args . body) ...) . body)
+  ;; => (let ((f nil)) (set! f (fn args . body)) . body)
+  (let ((defs (list:map
+               binds
+               (fn (bind) `(,(car bind) nil))))
+        (sets (list:map
+               binds
+               (fn (x) `(set! ,(car x) (fn ,(second x) ,@(cddr x)))))))
     `(let ,defs ,@sets ,@body)))
 
 
 (demac (loop name binds . body)
   ;; (loop name ((var val) ...) . body)
-  ;; => (letrec ((name (fn (var ...) . body))) (name val ...))
+  ;; => (letrec ((name (var ...) . body))) (name val ...))
   (let ((vars (list:map binds car))
         (vals (list:map binds second)))
-    `(letrec ((,name (fn ,vars ,@body))) (,name ,@vals))))
+    `(letrec ((,name ,vars ,@body)) (,name ,@vals))))
 
 
 (demac (when cond . body)
@@ -558,7 +568,7 @@
                       (f    (third expr))
                       (args (second f))
                       (body (cddr   f)))
-                  (push! letrec-binds (list name `(fn ,args ,@body))))
+                  (push! letrec-binds `(,name ,args ,@body)))
                 (collect rest))
               (set! rest-body body)))))
       (let ((f (if letrec-binds
@@ -582,8 +592,11 @@
      (let ((i 0))
        (fn () (set! i (+ i 1)))))
 
-(de (sym:gen)
-  (sym:new (str "#g:" (sym:gensym-counter))))
+(de (sym:gen-gen prefix)
+  (fn ()
+    (sym:new (str prefix (sym:gensym-counter)))))
+
+(de sym:gen (sym:gen-gen "#g:"))
 
 
 ;; system
@@ -765,3 +778,58 @@
       (if rest
         (rec wrapped (car rest) (cdr rest))
         wrapped))))
+
+
+;; match
+;; =====================================
+
+(de (expand-match expr clauses)
+  (let ((gensym (sym:gen-gen "#match:"))
+        (root   (gensym)))
+    (letrec
+     ((failed ()
+              `(error "unmatched for" ,root))
+      (match1 (expr pat body clauses next)
+              (cond
+               ((not pat) ;; matched
+                `(if (not ,expr) (begin ,@body)))
+               ((pair? pat)
+                (let ((fst (car pat))
+                      (e2  (gensym)))
+                  (cond
+                   ;; quote
+                   ((and (pair? fst) (= 'quote (car fst)))
+                    ;;TODO: equal
+                    `(if (and (pair? ,expr) (= (car ,expr) ',(cdr fst)))
+                       (let ((,e2 (cdr ,expr)))
+                         ,(match1 e2 (cdr pat) body clauses next))
+                       ,(next clauses)))
+                   ;; number
+                   ((number? fst)
+                    `(if (and (pair? ,expr) (= (car ,expr) ,fst))
+                       (let ((,e2 (cdr ,expr)))
+                         ,(match1 e2 (cdr pat) body clauses next))
+                       ,(next clauses)))
+                   ;; var
+                   ((symbol? fst)
+                    `(if (pair? ,expr)
+                       (let ((,fst (car ,expr))
+                             (,e2  (cdr ,expr)))
+                         ,(match1 e2 (cdr pat) body clauses next))
+                       ,(next clauses)))
+                   (else (error "match1 notimplemented for" pat)))))
+               (else (error "match1 notimplemented for" pat))))
+      (step1 (clauses)
+             (if clauses
+               (let ((clause  (car clauses))
+                     (pat     (car clause))
+                     (body    (cdr clause))
+                     (clauses (cdr clauses)))
+                 (match1 root pat body clauses step1))
+               (failed))))
+     `(let ((,root ,expr))
+        ,(step1 clauses)))))
+
+
+(demac (match expr . clauses)
+  (expand-match expr clauses))

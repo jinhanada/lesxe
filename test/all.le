@@ -84,3 +84,9 @@
 
 (test internal-de
   (assert= 11 (internal-test)))
+
+
+(test match1
+  (assert= 5 (match '(1 2 3) ((1 a b) (+ a b))))
+  (assert= 5 (match '(a 2 3) (('a b c) (+ b c))))
+  )
