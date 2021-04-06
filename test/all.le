@@ -102,4 +102,10 @@
   (assert= 5
            (match '(a 2 3)
              (((? symbol?) b c) (+ b c))))
+
+  ;; nested
+  (assert= 10
+           (match '((1 2) 3 (4))
+             (((a b) c (d))
+              (+ a b c d))))
   )

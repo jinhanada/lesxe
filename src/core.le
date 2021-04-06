@@ -693,6 +693,18 @@
           (cons x (apply list:cons* xs)))
       x))
 
+(de (list:fold xs init f)
+  (loop rec ((xs xs) (acc init))
+    (if xs
+      (rec (cdr xs) (f acc (car xs)))
+      acc)))
+
+
+;; arithmetics 2
+;; =====================================
+
+(set! + (fn xs (list:fold xs 0 (fn (a b) (%prim:add a b)))))
+
 
 ;; string 2
 ;; =====================================
@@ -792,9 +804,9 @@
     (letrec
      ((failed ()
               `(error "unmatched for" ,root))
-      (match1 (expr pat next ok ng)
+      (match1 (expr pat next ng)
               (cond
-               ((not pat) (ok))
+               ((not pat) (next))
                ((symbol? pat) ;; bind rest
                 `(let ((,pat ,expr)) ,(next)))
                ((number? pat)
@@ -815,10 +827,10 @@
                     (let ((e3 (gensym))
                           (rest-next
                            (fn ()
-                             (match1 e3 (cdr pat) next ok ng))))
+                             (match1 e3 (cdr pat) next ng))))
                       `(let ((,e2 (car ,expr))
                              (,e3 (cdr ,expr)))
-                         ,(match1 e2 fst rest-next ok ng)))))))
+                         ,(match1 e2 fst rest-next ng)))))))
                (else (error "match1 notimplemented for" pat))))
       (step1 (clauses)
              (if clauses
@@ -826,10 +838,9 @@
                      (pat     (car clause))
                      (body    (cdr clause))
                      (ok      (fn () `(begin ,@body)))
-                     (next    ok)
                      (clauses (cdr clauses))
                      (ng      (fn () (step1 clauses))))
-                 (match1 root pat next ok ng))
+                 (match1 root pat ok ng))
                (failed))))
      `(let ((,root ,expr))
         ,(step1 clauses)))))
