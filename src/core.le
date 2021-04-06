@@ -793,6 +793,9 @@
               (cond
                ((not pat) ;; matched
                 `(if (not ,expr) (begin ,@body)))
+               ((symbol? pat) ;; bind rest
+                `(let ((,pat ,expr))
+                   (begin ,@body)))
                ((pair? pat)
                 (let ((fst (car pat))
                       (e2  (gensym)))

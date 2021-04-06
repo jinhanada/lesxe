@@ -87,6 +87,14 @@
 
 
 (test match1
+  ;; number
   (assert= 5 (match '(1 2 3) ((1 a b) (+ a b))))
+
+  ;; quote
   (assert= 5 (match '(a 2 3) (('a b c) (+ b c))))
+
+  ;; rest
+  (assert= 5
+           (match '(1 2 3)
+             ((1 . xs) (+ (car xs) (second xs)))))
   )
