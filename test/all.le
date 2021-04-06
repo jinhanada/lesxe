@@ -57,12 +57,11 @@
 
 (test cond
   (letrec
-      ((f
-        (fn (n)
+      ((f (n)
           (cond
            ((= n 1) 'a)
            ((= n 2) 'b)
-           (else    'c)))))
+           (else    'c))))
     (assert= 'a (f 1))
     (assert= 'b (f 2))
     (assert= 'c (f 3))))
@@ -92,6 +91,7 @@
 
   ;; quote
   (assert= 5 (match '(a 2 3) (('a b c) (+ b c))))
+  (assert= 5 (match 'a ('a 5)))
 
   ;; rest
   (assert= 5
