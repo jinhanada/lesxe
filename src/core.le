@@ -828,9 +828,11 @@
                           (rest-next
                            (fn ()
                              (match1 e3 (cdr pat) next ng))))
-                      `(let ((,e2 (car ,expr))
-                             (,e3 (cdr ,expr)))
-                         ,(match1 e2 fst rest-next ng)))))))
+                      `(if (pair? ,expr)
+                         (let ((,e2 (car ,expr))
+                               (,e3 (cdr ,expr)))
+                           ,(match1 e2 fst rest-next ng))
+                         ,(ng)))))))
                (else (error "match1 notimplemented for" pat))))
       (step1 (clauses)
              (if clauses

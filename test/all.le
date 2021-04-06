@@ -92,6 +92,10 @@
   ;; quote
   (assert= 5 (match '(a 2 3) (('a b c) (+ b c))))
   (assert= 5 (match 'a ('a 5)))
+  (assert= 5
+           (match 'a
+             (('a) 6)
+             ('a   5)))
 
   ;; rest
   (assert= 5
