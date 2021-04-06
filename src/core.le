@@ -800,13 +800,22 @@
                 (let ((fst (car pat))
                       (e2  (gensym)))
                   (cond
-                   ;; quote
-                   ((and (pair? fst) (= 'quote (car fst)))
-                    ;;TODO: equal
-                    `(if (and (pair? ,expr) (= (car ,expr) ',(cdr fst)))
-                       (let ((,e2 (cdr ,expr)))
-                         ,(match1 e2 (cdr pat) body clauses next))
-                       ,(next clauses)))
+                   ((pair? fst)
+                    (cond
+                     ;; quote
+                     ((= 'quote (car fst))
+                      ;;TODO: equal
+                      `(if (and (pair? ,expr) (= (car ,expr) ',(cdr fst)))
+                         (let ((,e2 (cdr ,expr)))
+                           ,(match1 e2 (cdr pat) body clauses next))
+                         ,(next clauses)))
+                     ;; pred
+                     ((= '? (car fst))
+                      `(if (,(second fst) (car ,expr))
+                         (let ((,e2 (cdr ,expr)))
+                           ,(match1 e2 (cdr pat) body clauses next))
+                         ,(next clauses)))
+                     (else (error "match1 notimplemented for" pat))))
                    ;; number
                    ((number? fst)
                     `(if (and (pair? ,expr) (= (car ,expr) ,fst))
