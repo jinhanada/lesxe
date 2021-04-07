@@ -699,6 +699,23 @@
       (rec (cdr xs) (f acc (car xs)))
       acc)))
 
+(de (list:remove xs x)
+  (loop rec ((xs xs) (acc nil))
+    (if xs
+      (rec (cdr xs)
+           (if (= x (car xs)) acc (cons (car xs) acc)))
+      (list:reverse! acc))))
+
+(de (list:equal? xs ys)
+  ;; naive, cause infinite loop on recursive list
+  (loop rec ((xs xs) (ys ys))
+    (cond
+     ((and (not xs) (not ys)) true)
+     ((not xs) nil)
+     ((not ys) nil)
+     ((not (= (car xs) (car ys))) nil)
+     (else (rec (cdr xs) (cdr ys))))))
+
 
 ;; arithmetics 2
 ;; =====================================
@@ -745,6 +762,16 @@
     (if xs
       (str x what (rec (car xs) (cdr xs)))
       (str x))))
+
+
+;; equal?
+;; =====================================
+
+(de (equal? a b)
+  (cond
+   ((and (pair? a) (pair? b)) (list:equal? a b))
+   ((and (string? a) (string? b)) (s= a b))
+   (else (= a b))))
 
 
 ;; record-case

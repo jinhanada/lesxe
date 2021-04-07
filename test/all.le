@@ -10,10 +10,20 @@
   (or cond (raise 'assert)))
 
 (demac (assert= a b)
-  `(let ((x ,a)
-         (y ,b))
-     (or (= x y)
-         (raise (list 'assert= '(,a ,b) 'but 'got (list x y))))))
+  (let ((x (sym:gen))
+        (y (sym:gen)))
+    `(let ((,x ,a)
+           (,y ,b))
+       (or (= ,x ,y)
+           (raise (list 'assert ',a '= ',b 'but 'got ,x 'and ,y))))))
+
+(demac (assert-equal a b)
+  (let ((x (sym:gen))
+        (y (sym:gen)))
+    `(let ((,x ,a)
+           (,y ,b))
+       (or (equal? ,x ,y)
+           (raise (list 'assert ',a 'equals ',b 'but 'got ,x 'and ,y))))))
 
 
 (test letrec
@@ -112,4 +122,16 @@
            (match '((1 2) 3 (4))
              (((a b) c (d))
               (+ a b c d))))
+  )
+
+
+(test list:equal?
+  (assert= true (list:equal? '(a b c) '(a b c)))
+  (assert= true (list:equal? '(a) '(a))))
+
+
+(test list:remove
+  (assert-equal '(a b c) (list:remove '(a b c)   'x))
+  (assert-equal '(a b c) (list:remove '(a b x c) 'x))
+  (assert-equal '(a b c) (list:remove '(x a b c) 'x))
   )
