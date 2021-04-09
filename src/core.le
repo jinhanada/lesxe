@@ -716,6 +716,12 @@
      ((not (= (car xs) (car ys))) nil)
      (else (rec (cdr xs) (cdr ys))))))
 
+(de (list:map2 xs ys f)
+  (loop rec ((xs xs) (ys ys) (acc nil))
+    (if (and xs ys)
+      (rec (cdr xs) (cdr ys) (cons (f (car xs) (car ys)) acc))
+      (list:reverse! acc))))
+
 
 ;; arithmetics 2
 ;; =====================================
