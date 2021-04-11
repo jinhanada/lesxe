@@ -883,3 +883,30 @@
 
 (demac (match expr . clauses)
   (expand-match expr clauses))
+
+
+
+;; Record
+;; =====================================
+;; desc:   [(<TypeTag>) size fields]
+;; record: [desc field1 field2 ...]
+
+(de record:offset-tag    0)
+(de record:offset-size   1)
+(de record:offset-fields 2)
+(de record:desc-size     3)
+
+(de (new-record-desc name fields)
+  (let ((tag (list name))
+        (size (list:len fields))
+        (desc (array:new record:desc-size)))
+    (array:set! desc record:offset-tag    tag)
+    (array:set! desc record:offset-size   size)
+    (array:set! desc record:offset-fields fields)
+    desc))
+
+(de (new-record desc)
+  (let ((size   (+ (array:get desc record-offset-size) 1))
+        (record (array:new size)))
+    (array:set! record 0 desc)
+    record))
