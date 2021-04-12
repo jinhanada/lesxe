@@ -976,10 +976,18 @@ static void toStrSub(Str* s, Obj x) {
   case Le_symbol:
     return putStr(s, symNameStr(x));
   case Le_pair:
-    putStr(s, "(");
-    toStrSub(s, Car(x));
-    toStrListBody(s, Cdr(x));
-    return putStr(s, ")");
+    if (le_is_symbol(Car(x)) &&
+        strcmp("quote", le_cstr_of((Car(x))->Symbol.name)) == 0) {
+      //TODO: optimize via immediate symbol
+      putStr(s, "'");
+      toStrSub(s, Cdr(x));
+      return;
+    } else {
+      putStr(s, "(");
+      toStrSub(s, Car(x));
+      toStrListBody(s, Cdr(x));
+      return putStr(s, ")");
+    }
   case Le_string:
     putStr(s, "\"");
     toStrStr(s, x);
