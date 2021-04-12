@@ -910,3 +910,27 @@
         (record (array:new size)))
     (array:set! record 0 desc)
     record))
+
+(de (make-record desc values)
+  (let ((record (new-record desc)))
+    (loop rec ((offset 1) (values values))
+      (if values
+        (let ()
+          (array:set! record offset (car values))
+          (rec (inc offset) (cdr values))
+          )
+        record))))
+
+(de (expand-defrecord name fields)
+  (let ((desc-sym   (sym:new (str "<desc>-" (sym:str name))))
+        (make-desc  `(def ,desc-sym (new-record-desc ',name ',fields)))
+        (make-maker `(def ,name (lambda ,fields (make-record ,desc-sym ,@fields)))))
+    (prn
+     `(let ()
+        ,make-desc
+        ,make-maker)))
+  `(prn 'here)
+  )
+
+(demac (defrecord name . fields)
+  (expand-defrecord name fields))

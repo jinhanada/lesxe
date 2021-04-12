@@ -135,3 +135,6 @@
   (assert-equal '(a b c) (list:remove '(a b x c) 'x))
   (assert-equal '(a b c) (list:remove '(x a b c) 'x))
   )
+
+
+(defrecord <foo> a b c)
