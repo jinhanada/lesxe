@@ -137,4 +137,15 @@
   )
 
 
+
 (defrecord <foo> a b c)
+
+(test defrecord
+  (let ((r (<foo> 1 2 3)))
+    (<foo>-a! r (inc (<foo>-a r) 1))
+    (<foo>-b! r (inc (<foo>-b r) 1))
+    (<foo>-c! r (inc (<foo>-c r) 1))
+    (assert-equal '(2 3 4)
+                  (list (<foo>-a r)
+                        (<foo>-b r)
+                        (<foo>-c r)))))

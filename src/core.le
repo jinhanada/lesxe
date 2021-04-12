@@ -722,6 +722,12 @@
       (rec (cdr xs) (cdr ys) (cons (f (car xs) (car ys)) acc))
       (list:reverse! acc))))
 
+(de (list:map-index xs f)
+  (loop rec ((xs xs) (i 0) (acc nil))
+    (if xs
+      (rec (cdr xs) (inc i) (cons (f i (car xs)) acc))
+      (list:reverse! acc))))
+
 
 ;; arithmetics 2
 ;; =====================================
@@ -885,7 +891,6 @@
   (expand-match expr clauses))
 
 
-
 ;; Record
 ;; =====================================
 ;; desc:   [(<TypeTag>) size fields]
@@ -906,7 +911,7 @@
     desc))
 
 (de (new-record desc)
-  (let ((size   (+ (array:get desc record-offset-size) 1))
+  (let ((size   (+ (array:get desc record:offset-size) 1))
         (record (array:new size)))
     (array:set! record 0 desc)
     record))
@@ -917,20 +922,40 @@
       (if values
         (let ()
           (array:set! record offset (car values))
-          (rec (inc offset) (cdr values))
-          )
+          (rec (inc offset) (cdr values)))
         record))))
+
+(de (get-record-value record value-offset)
+  (array:get record (+ value-offset 1)))
+
+(de (set-record-value record value-offset value)
+  (array:set! record (+ value-offset 1) value))
 
 (de (expand-defrecord name fields)
   (let ((desc-sym   (sym:new (str "<desc>-" (sym:str name))))
         (make-desc  `(def ,desc-sym (new-record-desc ',name ',fields)))
-        (make-maker `(def ,name (lambda ,fields (make-record ,desc-sym ,@fields)))))
-    (prn
-     `(let ()
-        ,make-desc
-        ,make-maker)))
-  `(prn 'here)
-  )
+        (make-maker `(def ,name (fn ,fields (make-record ,desc-sym (list ,@fields)))))
+        (make-getters
+         (list:map-index
+          fields
+          (fn (i field)
+            (let ((sym (sym:new (str (sym:str name) "-" (sym:str field))))
+                  (rec (sym:gen)))
+              `(def ,sym (fn (,rec) (get-record-value ,rec ,i)))))))        
+        (make-setters
+         (list:map-index
+          fields
+          (fn (i field)
+            (let ((sym (sym:new (str (sym:str name) "-" (sym:str field) "!")))
+                  (rec (sym:gen))
+                  (val (sym:gen)))
+              `(def ,sym (fn (,rec ,val)
+                           (set-record-value ,rec ,i ,val))))))))
+    `(let ()
+       ,make-desc
+       ,make-maker
+       ,@make-getters
+       ,@make-setters)))
 
 (demac (defrecord name . fields)
   (expand-defrecord name fields))
