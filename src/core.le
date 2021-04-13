@@ -103,6 +103,7 @@
 
 
 ;; ===== assoc (mutable) =====
+;; For mutation first element is sign and variables should hold it
 
 (def assoc:sign '<assoc>)
 
@@ -132,6 +133,12 @@
 (def assoc:get
      (fn (assoc key)
        (cdr (assoc:ref assoc key))))
+
+(def assoc:set ;; push
+     (fn (assoc key val)
+       (cons
+        (car assoc)
+        (cons (cons key val) (cdr assoc)))))
 
 (def assoc:set!
      (fn (assoc key val)
