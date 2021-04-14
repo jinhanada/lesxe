@@ -56,7 +56,7 @@ enum {
       SymPrimReadTextFile, SymPrimWriteTextFile,
       /* read */ SymPrimReadStr,
       /* error */ SymPrimRaise,
-      /* system */ SymPrimExit, SymPrimGC, SymPrimLoadFile,
+      /* system */ SymPrimExit, SymPrimGC, SymPrimLoadFile, SymPrimSysTime,
       /* network */
       SymPrimSocketMake, SymPrimSocketListen, SymPrimSocketAccept, SymPrimSocketRecv,
       SymPrimSocketSend, SymPrimSocketClose,
@@ -2146,6 +2146,15 @@ static int primLoadFile(LeVM* vm, Obj args) {
   return le_load_file(vm, le_cstr_of(fname));
 }
 
+static int primSysTime(LeVM* vm, Obj args) {
+  struct timespec t;
+  timespec_get(&t, TIME_UTC);
+  Obj sec = le_int2obj(t.tv_sec);
+  Obj nsec = le_int2obj(t.tv_nsec);
+  vm->result = Cons(vm, sec, nsec);
+  return Le_OK;
+}
+
 
 // ===== Network =====
 
@@ -2704,6 +2713,7 @@ static void setupPrimitives(LeVM* vm) {
   DefPrim(Exit,              "exit");
   DefPrim(GC,                "gc");
   DefPrim(LoadFile,          "load-file");
+  DefPrim(SysTime,           "sys-time");
   /* Network */
   DefPrim(SocketMake,        "socket-make");
   DefPrim(SocketListen,      "socket-listen");

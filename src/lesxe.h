@@ -15,6 +15,9 @@
 #include <netinet/in.h>
 #include <poll.h>
 
+// time
+#include <time.h>
+
 
 // Types & Structs
 // =============================================================================

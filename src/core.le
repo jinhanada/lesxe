@@ -107,6 +107,11 @@
 
 (def assoc:sign '<assoc>)
 
+(def assoc?
+     (fn (xs)
+       (if (pair? xs)
+         (= assoc:sign (car xs)))))
+
 (def assoc:new
      (fn args
        (let ((rec nil))
@@ -134,11 +139,19 @@
      (fn (assoc key)
        (cdr (assoc:ref assoc key))))
 
+(def assoc:get-or
+     (fn (assoc key f)
+       (let ((ref (assoc:ref assoc key)))
+         (if ref
+           (cdr ref)
+           (f)))))
+
 (def assoc:set ;; push
      (fn (assoc key val)
        (cons
         (car assoc)
-        (cons (cons key val) (cdr assoc)))))
+        (cons (cons key val)
+              (cdr assoc)))))
 
 (def assoc:set!
      (fn (assoc key val)
@@ -426,8 +439,13 @@
 
 ;; ===== expand =====
 
+(def macro:time nil)
+(def *expand-loop* 0)
+(def *expand1-loop* 0)
+
 (set! expand-macro-1
       (fn (counter expr)
+        (set! *expand1-loop* (+ *expand1-loop* 1))
         (if (pair? expr)
             (let ((x  (car expr))
                   (xs (cdr expr))
@@ -438,7 +456,7 @@
                   (if macro
                       (let ()
                         (counter)
-                        (apply macro xs))
+                        (expand-macro-1 counter (apply macro xs)))
                       (cons (expand-macro-1 counter x)
                             (list:map xs (fn (x) (expand-macro-1 counter x)))))))
             expr)))
@@ -450,17 +468,24 @@
              (loop nil))
          (set! loop
                (fn (expr)
+                 (set! *expand-loop* (+ *expand-loop* 1))
                  (if (> count 0)
                    (let ()
                      (set! count 0)
                      (loop (expand-macro-1 counter expr)))
-                   expr)))
+                   (let ()
+                     expr))))
          (loop expr))))
 
 (set! %pre-eval
       (fn (expr)
+        (set! *expand-loop* 0)
+        (set! *expand1-loop* 0)
         (let ((expanded (expand-macro expr)))
-          (if macro:debug (print (list 'expanded expanded)))
+          (if macro:debug
+            (print (list 'expanded expanded)))
+          (if macro:time
+            (prn 'expand *expand-loop* ': *expand1-loop*))
           expanded)))
 
 
@@ -620,6 +645,33 @@
 
 (de (sys:load-files files)
   (list:each files sys:load))
+
+(de (sys:time)
+  (%prim:sys-time))
+
+(de (sys:time-sec)
+  (car (sys:time)))
+
+(de (time f)
+  (let ((start (sys:time-sec))
+        (r     (f))
+        (end   (sys:time-sec))
+        (diff  (- end start))
+        (sec   (mod diff 60))
+        (min   (/ diff 60)))
+    (prn (str "ellapsed = " min ":" sec))
+    r))
+
+(de time-pre-eval
+  (let ((old-pre-eval %pre-eval)
+        (measure
+         (fn (expr)
+           (prn "===== pre-eval =====")
+           (time (fn () (old-pre-eval expr))))))
+    (fn (sw)
+      (if sw
+        (set! %pre-eval measure)
+        (set! %pre-eval old-pre-eval)))))
 
 
 ;; array 2
